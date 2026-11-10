@@ -60,3 +60,9 @@ that row back to manual. Older migrated rows keep their counts and are the start
 The Overview has a **Key & rules** card under the compliance tile. FV: days CIP and SIP must be before the brew, and the
 "<72 h" exception. BBT: days before transfer, which tanks are DME, and how many fills before a CIP is required.
 Changes apply to every status, tile and alert immediately and are saved with the data (Reset restores the workbook's values).
+
+## Excel export
+
+The **Excel** button in the header (left of the Saved indicator) downloads a styled workbook for the year shown on the
+Overview: a Summary sheet (compliance %, counts, the rules in force, colour key), Fermenters and Brite tanks (real Excel
+dates, coloured status cells, filters, frozen headers), all in the site's colour palette.

@@ -5,6 +5,7 @@ import { fvStatus, bbtStatus, addDays, mondayOf, fmtDate, fmtDateY, parseList, f
 import { detectKind, parseBoard, parseLegacy } from './board.js';
 import { planBoardImport, planLegacyImport } from './merge.js';
 import { DEFAULT_RULES } from './ops.js';
+import { buildReport } from './report.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $('#app');
@@ -100,6 +101,7 @@ document.addEventListener('click', (e) => {
     case 'browse': $('#file').click(); break;
     case 'log': openLog(d.t); break;
     case 'export': exportCsv(d.t); break;
+    case 'xlsx': exportXlsx(); break;
     case 'settings': openSettings(); break;
     default: break;
   }
@@ -329,6 +331,18 @@ function logBbt(bbt, acidCip, count, type, sip = '') {
 }
 
 /* ---------- CSV ---------- */
+function exportXlsx() {
+  try {
+    const year = S.ui.year, today = todayISO();
+    const bytes = buildReport(db(), config(), year, today);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = `Balter-CIP-SIP-Compliance-${year}-${today}.xlsx`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast(`Excel report for ${year} downloaded`);
+  } catch (err) { console.error(err); toast('Couldn’t build the Excel report'); }
+}
 function exportCsv(kind) {
   const cfg = config(), today = todayISO(), year = S.ui.year;
   const q = (v) => { const s = v === null || v === undefined ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };

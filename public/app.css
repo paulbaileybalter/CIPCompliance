@@ -78,6 +78,8 @@ h1 { font-size: 20px; font-weight: 600; letter-spacing: -.01em; white-space: now
 .btn.ghost:hover { background: #f3f3f3; }
 .btn.icon { padding: 8px; }
 .btn.small { padding: 5px 11px; font-size: 13px; }
+.btn.xl { display: inline-flex; align-items: center; gap: 6px; border-color: var(--mint); color: #0f6b52; font-weight: 600; background: var(--mint-t); }
+.btn.xl:hover { background: var(--mint); color: #000; }
 .btn.wide { width: 100%; padding: 11px; font-size: 15px; }
 .btn:disabled { opacity: .45; pointer-events: none; }
 .icon-btn { border: 0; background: transparent; padding: 6px; border-radius: 8px; color: var(--ink-3); display: inline-flex; }
@@ -305,8 +307,8 @@ code { font-size: 12px; background: #f3f3f3; padding: 1px 6px; border-radius: 6p
 @media (max-width: 1100px) { .now { display: none; } .grid2 { grid-template-columns: 1fr; } .grid2 > .right { order: -1; } }
 @media (max-width: 900px) {
   .header-in { flex-wrap: wrap; padding: 10px 14px; gap: 10px; }
-  .hright { width: 100%; justify-content: space-between; margin-left: 0; }
-  .tabs { flex: 1; } .tab { flex: 1; padding: 7px 8px; }
+  .hright { width: 100%; justify-content: space-between; margin-left: 0; flex-wrap: wrap; gap: 10px; }
+  .tabs { flex: 1 1 100%; } .tab { flex: 1; padding: 7px 8px; white-space: nowrap; }
   .page { padding: 16px 14px 70px; }
   .stiles { grid-template-columns: repeat(2, 1fr); }
   .glasses { grid-template-columns: 1fr; }

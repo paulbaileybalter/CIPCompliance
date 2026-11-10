@@ -75,6 +75,26 @@ test('a SIP dated before its CIP is flagged for checking (FV and BBT CIP+SIP ent
   const b = (acidSip) => bbtStatus({ bbt: 4, acidCip: '2026-06-18', acidType: 'cip', acidSip, transfer: '2026-06-20', acidCount: 0 }, [3, 4], T);
   assert.equal(b('2026-06-17').state, 'check'); assert.equal(b('2026-06-18').state, 'ok'); assert.equal(b('').state, 'ok');
 });
+test('Excel report: three styled sheets, real dates, status colours, escaped text', async () => {
+  const { buildReport } = await import('../public/js/report.js');
+  const { unzipSync, strFromU8 } = await import('../public/vendor/fflate.js');
+  const db = emptyDb(); db.cfg.dme = '3-6';
+  applyOps(db, [
+    { op: 'put', t: 'fv', rec: { id: 'a', fv: 5, cip: '2026-06-15', sip: '2026-06-18', brew: '2026-06-20', recipe: 'IPA & <Pale>', bsrc: 'board' } },
+    { op: 'put', t: 'fv', rec: { id: 'b', fv: 6, cip: '', sip: '', brew: '2026-06-21' } },
+    { op: 'put', t: 'bbt', rec: { id: 'c', bbt: 4, acidCip: '2026-06-19', acidType: 'cip', acidSip: '2026-06-19', acidCount: 0, transfer: '2026-06-20', batch: 'Lager' } },
+  ]);
+  const cfg = { rules: DEFAULT_RULES, dme: [3, 4, 5, 6] };
+  const files = unzipSync(buildReport(db, cfg, 2026, '2026-11-11'));
+  for (const f of ['[Content_Types].xml', 'xl/workbook.xml', 'xl/styles.xml', 'xl/worksheets/sheet1.xml', 'xl/worksheets/sheet2.xml', 'xl/worksheets/sheet3.xml']) assert.ok(files[f], f);
+  const wb = strFromU8(files['xl/workbook.xml']);
+  assert.match(wb, /name="Summary"/); assert.match(wb, /name="Fermenters"/); assert.match(wb, /name="Brite tanks"/);
+  const fv = strFromU8(files['xl/worksheets/sheet2.xml']);
+  assert.match(fv, /IPA &amp; &lt;Pale&gt;/, 'text is escaped');
+  assert.match(fv, /<v>46193<\/v>/, '2026-06-20 is a real Excel date serial');
+  assert.match(fv, /Not compliant|Needs data/); assert.match(fv, /<autoFilter ref="A4:H6"\/>/);
+  assert.match(strFromU8(files['xl/styles.xml']), /FF47D7AC/, 'uses the brand mint');
+});
 test('planned rows are never judged early', () => {
   const f = fvStatus({ fv: 1, brew: '2026-11-22', cip: '2026-11-10', sip: '2026-11-10' }, T);
   assert.equal(f.state, 'wait'); assert.equal(f.label, 'CIP/SIP too early'); assert.ok(f.reasons.length);
