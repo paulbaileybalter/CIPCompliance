@@ -14,7 +14,8 @@ const SESSION_TTL = 60 * 60 * 24 * 30;
 const PBKDF2_ITER = 100000;                 // Workers' maximum
 const MAX_BODY = 3_000_000;
 const MAX_OPS = 5000;
-const MAX_FAILS = 10;
+const MAX_FAILS = 5;                 // wrong PINs per IP, then locked out for an hour
+const PIN_RE = /^\d{4}$/;
 
 // Reachable without a session (just enough to render the sign-in page).
 const PUBLIC = new Set(['/login', '/login.js', '/app.css', '/favicon.svg', '/icon-192.png', '/icon-512.png', '/manifest.json', '/fonts/lexend-latin-wght-normal.woff2']);
@@ -84,7 +85,7 @@ async function authRoutes(request, env, url, secure) {
   if (path === '/api/auth/setup') {
     if (auth) return json({ error: 'Already set up' }, 409);
     if (env.SETUP_CODE && body.code !== env.SETUP_CODE) return json({ error: 'Setup code is incorrect' }, 403);
-    if (password.length < 8 || password.length > 200) return json({ error: 'Choose a password of at least 8 characters' }, 400);
+    if (!PIN_RE.test(password)) return json({ error: 'Choose a 4-digit PIN' }, 400);
     await env.KV.put('auth', JSON.stringify(await hashPassword(password)));
     return json({ ok: true }, 200, { 'set-cookie': await newSession(env, secure) });
   }
@@ -94,10 +95,10 @@ async function authRoutes(request, env, url, secure) {
   if (path === '/api/auth/login') {
     if (!auth) return json({ error: 'Not set up yet' }, 409);
     const fails = Number(await env.KV.get(rlKey)) || 0;
-    if (fails >= MAX_FAILS) return json({ error: 'Too many attempts — try again in 15 minutes' }, 429);
+    if (fails >= MAX_FAILS) return json({ error: 'Too many attempts — try again in an hour' }, 429);
     if (!(await checkPassword(password, auth))) {
-      await env.KV.put(rlKey, String(fails + 1), { expirationTtl: 900 });
-      return json({ error: 'Wrong password' }, 401);
+      await env.KV.put(rlKey, String(fails + 1), { expirationTtl: 3600 });
+      return json({ error: 'Wrong PIN' }, 401);
     }
     if (fails) await env.KV.delete(rlKey);
     return json({ ok: true }, 200, { 'set-cookie': await newSession(env, secure) });
@@ -105,8 +106,8 @@ async function authRoutes(request, env, url, secure) {
   if (path === '/api/auth/password') {
     if (!authed || !auth) return json({ error: 'Sign in first' }, 401);
     const next = typeof body.next === 'string' ? body.next : '';
-    if (!(await checkPassword(typeof body.current === 'string' ? body.current : '', auth))) return json({ error: 'Current password is wrong' }, 403);
-    if (next.length < 8 || next.length > 200) return json({ error: 'New password must be at least 8 characters' }, 400);
+    if (!(await checkPassword(typeof body.current === 'string' ? body.current : '', auth))) return json({ error: 'Current PIN is wrong' }, 403);
+    if (!PIN_RE.test(next)) return json({ error: 'The new PIN must be exactly 4 digits' }, 400);
     await env.KV.put('auth', JSON.stringify(await hashPassword(next)));
     return json({ ok: true });
   }

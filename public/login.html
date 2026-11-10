@@ -21,8 +21,8 @@
     <h1>CIP / SIP Compliance</h1>
     <p class="muted" id="lead">Checking…</p>
     <label id="codeRow" hidden>Setup code<input type="password" id="code" autocomplete="off"></label>
-    <label>Password<input type="password" id="pw" autocomplete="current-password" required autofocus></label>
-    <label id="pw2Row" hidden>Confirm password<input type="password" id="pw2" autocomplete="new-password"></label>
+    <label>PIN<input type="password" id="pw" inputmode="numeric" autocomplete="current-password" required autofocus></label>
+    <label id="pw2Row" hidden>Confirm PIN<input type="password" id="pw2" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label>
     <p class="msg err" id="msg" role="alert"></p>
     <button class="btn primary wide" id="go" type="submit" disabled>Continue</button>
     <div class="stripe" aria-hidden="true"></div>

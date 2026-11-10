@@ -335,10 +335,12 @@ function openSettings() {
         <label>Brite tanks (BBT) <input name="bbts" value="${esc(c.bbts)}" spellcheck="false"></label>
         <label>DME brite tanks <input name="dme" value="${esc(c.dme)}" spellcheck="false"><small class="muted">These may sit over 2 days after acid CIP (shown purple). Every other BBT is treated as Krones and must be filled within 2 days.</small></label>
         <div class="dlg-f flush"><button class="btn primary" type="submit">${I.check}<span>Save vessels</span></button></div></form>
-      <hr><form id="pwForm" class="form"><h4>Password</h4>
-        <div class="row2"><label>Current password<input type="password" name="current" autocomplete="current-password" required></label><label>New password<input type="password" name="next" autocomplete="new-password" minlength="8" required></label></div>
+      <hr><form id="pwForm" class="form"><h4>PIN</h4>
+        <div class="row2"><label>Current PIN<input type="password" name="current" inputmode="numeric" autocomplete="current-password" required></label><label>New 4-digit PIN<input type="password" name="next" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" required></label></div>
         <p class="msg" id="pwMsg" role="status"></p>
-        <div class="dlg-f flush"><button class="btn" type="submit">Change password</button></div></form>
+        <div class="dlg-f flush"><button class="btn" type="submit">Change PIN</button></div></form>
+      <hr><div class="form"><h4>History</h4><p class="muted">Merge the CIP/SIP history built into this site (from the Vessel &amp; Equipment CIP monitoring workbook, 2025 &amp; 2026) into your current data. Existing rows are matched, never duplicated or overwritten.</p>
+        <div class="dlg-f flush"><button class="btn" type="button" id="loadSeed">Load CIP history</button></div></div>
       <hr><div class="dlg-f flush split"><span class="muted">Daily backups of your data are kept for 30 days.</span><button class="btn" id="signOut">Sign out</button></div>`,
     onMount(m) {
       $('#cfgForm', m).addEventListener('submit', (e) => {
@@ -353,9 +355,20 @@ function openSettings() {
         const f = e.target, msg = $('#pwMsg', m);
         msg.textContent = 'Saving…'; msg.className = 'msg';
         const r = await api('/api/auth/password', { method: 'POST', body: { current: f.current.value, next: f.next.value } });
-        msg.textContent = r.ok ? 'Password changed.' : (r.data?.error || 'Couldn’t change the password');
+        msg.textContent = r.ok ? 'PIN changed.' : (r.data?.error || 'Couldn’t change the PIN');
         msg.className = 'msg ' + (r.ok ? 'ok' : 'err');
         if (r.ok) f.reset();
+      });
+      $('#loadSeed', m).addEventListener('click', async () => {
+        try {
+          const r = await fetch('/seed.json', { credentials: 'same-origin' });
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const d = await r.json();
+          const pick = (o, ks) => Object.fromEntries(ks.map((k) => [k, o[k]]));
+          previewLegacy('Built-in CIP history', { sheets: [{ name: 'CIP history (2025 + 2026)', warnings: [],
+            fv: d.fv.map((x) => pick(x, ['fv', 'cip', 'sip', 'brew'])),
+            bbt: d.bbt.map((x) => pick(x, ['bbt', 'acidCip', 'acidCount', 'transfer'])) }] });
+        } catch (err) { console.error(err); toast('Couldn’t load the built-in history'); }
       });
       $('#signOut', m).addEventListener('click', async () => { await api('/api/auth/logout', { method: 'POST' }); location.href = '/login'; });
     },

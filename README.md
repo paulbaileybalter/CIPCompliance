@@ -1,6 +1,6 @@
 # Balter Brewing – FV & BBT CIP/SIP Tracker
 
-A password-protected Cloudflare Worker site that replaces the "FV/BBT CIP Compliance" tab.
+A PIN-protected Cloudflare Worker site that replaces the "FV/BBT CIP Compliance" tab.
 Drop the Live Brewery Board (.xlsx) on the page to pull in FV/FMT brew dates and BBT transfer
 dates; enter CIP and SIP details by hand.
 
@@ -10,7 +10,7 @@ dates; enter CIP and SIP details by hand.
 2. Cloudflare dashboard → **Workers & Pages → Create → Import a repository** → pick the repo.
 3. Build settings: leave the build command empty; deploy command `npx wrangler deploy`.
 4. First deploy automatically creates the `KV` namespace (the binding in `wrangler.jsonc` has no id on purpose).
-5. Open the site URL. On first visit you'll be asked to **set a password** (min 8 characters).
+5. Open the site URL. On first visit you'll be asked to **set a 4-digit PIN**.
    To stop strangers claiming the setup screen before you do, add a `SETUP_CODE` variable
    (Worker → Settings → Variables) and enter it on that screen.
 
@@ -20,7 +20,7 @@ dates; enter CIP and SIP details by hand.
   and never overwrites CIP/SIP you've typed.
 - **Migrate old data once:** drop the old "Vessel & Equipment CIP monitoring" workbook; its
   "FVBBT CIP Compliance NN" sheets are imported.
-- Settings (gear icon): FV/BBT lists, which BBTs are DME, change password, sign out.
+- Settings (gear icon): FV/BBT lists, which BBTs are DME, change PIN, sign out.
 - Data is saved to KV; a daily backup (`bak:YYYY-MM-DD`) is kept for 30 days.
 
 ## Rules implemented
@@ -44,3 +44,7 @@ npm test        # parser, merge and rules tests
 is used with an empty KV store it loads that data automatically. To rebuild it from an updated workbook:
 `node scripts/build-seed.mjs path/to/Vessel_Equipment_CIP_monitoring.xlsx` and redeploy (only affects a fresh KV store).
 It contains your operational data, so keep the GitHub repo **private**.
+
+If the site already had data in it when you deployed (so the seed didn't auto-load), use **Settings → Load CIP history** to merge it in.
+
+**Forgot the PIN / already set a longer password?** In Cloudflare → Workers & Pages → KV, delete the `auth` key; the next visit shows the PIN setup screen again (your data is untouched).

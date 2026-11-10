@@ -1,4 +1,4 @@
-// Sign-in / first-time password setup.
+// Sign-in / first-time PIN setup.
 (async () => {
   const $ = (id) => document.getElementById(id);
   const msg = (t) => { $('msg').textContent = t || ''; };
@@ -6,19 +6,20 @@
   try { st = await (await fetch('/api/auth/status', { credentials: 'same-origin' })).json(); } catch { msg('Can’t reach the server — check your connection.'); }
   if (st.authed) { location.replace('/'); return; }
   const setup = !st.configured;
-  $('lead').textContent = setup ? 'First-time setup — choose a password for this site. Anyone you share it with can sign in.' : 'Enter the password to continue.';
+  $('lead').textContent = setup ? 'First-time setup — choose a 4-digit PIN for this site. Anyone you share it with can sign in.' : 'Enter your PIN to continue.';
   $('pw').autocomplete = setup ? 'new-password' : 'current-password';
   $('pw2Row').hidden = !setup;
+  if (setup) $('pw').maxLength = 4;      // existing longer passwords (from an earlier version) can still sign in
   $('codeRow').hidden = !(setup && st.needsCode);
-  $('go').textContent = setup ? 'Set password & enter' : 'Sign in';
+  $('go').textContent = setup ? 'Set PIN & enter' : 'Sign in';
   $('go').disabled = false;
   $('form').addEventListener('submit', async (e) => {
     e.preventDefault(); msg('');
     const password = $('pw').value;
     if (setup) {
-      if (password.length < 8) return msg('Use at least 8 characters.');
-      if (password !== $('pw2').value) return msg('The two passwords don’t match.');
-    } else if (!password) return msg('Enter the password.');
+      if (!/^\d{4}$/.test(password)) return msg('Choose a 4-digit PIN.');
+      if (password !== $('pw2').value) return msg('The two PINs don’t match.');
+    } else if (!password) return msg('Enter your PIN.');
     $('go').disabled = true;
     try {
       const res = await fetch(setup ? '/api/auth/setup' : '/api/auth/login', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, code: $('code').value }) });

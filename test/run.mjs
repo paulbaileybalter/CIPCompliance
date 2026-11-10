@@ -280,35 +280,36 @@ test('worker: first-time setup, login, wrong password, logout', async () => {
   const env = fakeEnv();
   let r = await call(env, '/api/auth/status'); assert.deepEqual(await r.json(), { configured: false, authed: false, needsCode: false });
   r = await call(env, '/api/auth/setup', { method: 'POST', body: { password: 'short' } }); assert.equal(r.status, 400);
-  r = await call(env, '/api/auth/setup', { method: 'POST', body: { password: 'hop-pocket-2026' } }); assert.equal(r.status, 200);
+  r = await call(env, '/api/auth/setup', { method: 'POST', body: { password: '12345' } }); assert.equal(r.status, 400, 'PIN must be exactly 4 digits');
+  r = await call(env, '/api/auth/setup', { method: 'POST', body: { password: '4827' } }); assert.equal(r.status, 200);
   const ck = cookieFrom(r); assert.match(ck, /^bct=/);
   assert.match(r.headers.get('set-cookie'), /HttpOnly/); assert.match(r.headers.get('set-cookie'), /Secure/); assert.match(r.headers.get('set-cookie'), /SameSite=Strict/);
-  assert.ok(!JSON.stringify([...env.store.values()]).includes('hop-pocket'), 'password is never stored in clear');
-  r = await call(env, '/api/auth/setup', { method: 'POST', body: { password: 'another-pass-1' } }); assert.equal(r.status, 409, 'cannot re-run setup');
+  assert.ok(!JSON.stringify([...env.store.values()]).includes('4827'), 'password is never stored in clear');
+  r = await call(env, '/api/auth/setup', { method: 'POST', body: { password: '1111' } }); assert.equal(r.status, 409, 'cannot re-run setup');
   r = await call(env, '/', { cookie: ck }); assert.equal(r.status, 200); assert.match(await r.text(), /asset:\/index.html/);
   r = await call(env, '/login', { cookie: ck }); assert.equal(r.status, 302);
   r = await call(env, '/api/auth/login', { method: 'POST', body: { password: 'wrong' } }); assert.equal(r.status, 401);
-  r = await call(env, '/api/auth/login', { method: 'POST', body: { password: 'hop-pocket-2026' } }); assert.equal(r.status, 200);
+  r = await call(env, '/api/auth/login', { method: 'POST', body: { password: '4827' } }); assert.equal(r.status, 200);
   const ck2 = cookieFrom(r);
   r = await call(env, '/api/auth/logout', { method: 'POST', cookie: ck2 }); assert.equal(r.status, 200);
   r = await call(env, '/api/db', { cookie: ck2 }); assert.equal(r.status, 401, 'session is revoked server-side');
 });
 test('worker: login is rate limited', async () => {
   const env = fakeEnv();
-  await call(env, '/api/auth/setup', { method: 'POST', body: { password: 'hop-pocket-2026' } });
-  let last; for (let i = 0; i < 11; i++) last = await call(env, '/api/auth/login', { method: 'POST', body: { password: 'nope' + i } });
+  await call(env, '/api/auth/setup', { method: 'POST', body: { password: '4827' } });
+  let last; for (let i = 0; i < 6; i++) last = await call(env, '/api/auth/login', { method: 'POST', body: { password: 'nope' + i } });
   assert.equal(last.status, 429);
-  const r = await call(env, '/api/auth/login', { method: 'POST', body: { password: 'hop-pocket-2026' } }); assert.equal(r.status, 429, 'even the right password waits');
+  const r = await call(env, '/api/auth/login', { method: 'POST', body: { password: '4827' } }); assert.equal(r.status, 429, 'even the right password waits');
 });
 test('worker: SETUP_CODE guards first-time setup', async () => {
   const env = fakeEnv({ SETUP_CODE: 'brew-crew' });
   assert.equal((await (await call(env, '/api/auth/status')).json()).needsCode, true);
-  let r = await call(env, '/api/auth/setup', { method: 'POST', body: { password: 'hop-pocket-2026', code: 'guess' } }); assert.equal(r.status, 403);
-  r = await call(env, '/api/auth/setup', { method: 'POST', body: { password: 'hop-pocket-2026', code: 'brew-crew' } }); assert.equal(r.status, 200);
+  let r = await call(env, '/api/auth/setup', { method: 'POST', body: { password: '4827', code: 'guess' } }); assert.equal(r.status, 403);
+  r = await call(env, '/api/auth/setup', { method: 'POST', body: { password: '4827', code: 'brew-crew' } }); assert.equal(r.status, 200);
 });
 test('worker: data API — save, read, version polling, backup, validation, CSRF', async () => {
   const env = fakeEnv();
-  const ck = cookieFrom(await call(env, '/api/auth/setup', { method: 'POST', body: { password: 'hop-pocket-2026' } }));
+  const ck = cookieFrom(await call(env, '/api/auth/setup', { method: 'POST', body: { password: '4827' } }));
   let r = await call(env, '/api/db', { cookie: ck }); let db = await r.json(); assert.deepEqual([db.fv, db.bbt], [[], []]); assert.equal(db.cfg.dme, '3-6');
   r = await call(env, '/api/db', { method: 'PUT', cookie: ck, body: { ops: [{ op: 'put', t: 'fv', rec: { id: 'a', fv: 12, cip: '2026-11-09', sip: '2026-11-09', brew: '2026-11-10' } }] } });
   assert.equal(r.status, 200); db = await r.json(); assert.equal(db.fv.length, 1); assert.ok(db.ver);
@@ -318,9 +319,9 @@ test('worker: data API — save, read, version polling, backup, validation, CSRF
   r = await call(env, '/api/db', { method: 'PUT', cookie: ck, body: { ops: [{ op: 'bogus' }] } }); assert.equal(r.status, 422);
   r = await call(env, '/api/db', { method: 'PUT', cookie: ck, body: { ops: 'x' } }); assert.equal(r.status, 400);
   r = await call(env, '/api/db', { method: 'PUT', cookie: ck, origin: 'https://evil.example', body: { ops: [] } }); assert.equal(r.status, 403);
-  r = await call(env, '/api/auth/password', { method: 'POST', cookie: ck, body: { current: 'bad', next: 'new-password-1' } }); assert.equal(r.status, 403);
-  r = await call(env, '/api/auth/password', { method: 'POST', cookie: ck, body: { current: 'hop-pocket-2026', next: 'new-password-1' } }); assert.equal(r.status, 200);
-  r = await call(env, '/api/auth/login', { method: 'POST', body: { password: 'new-password-1' } }); assert.equal(r.status, 200);
+  r = await call(env, '/api/auth/password', { method: 'POST', cookie: ck, body: { current: 'bad', next: '9034' } }); assert.equal(r.status, 403);
+  r = await call(env, '/api/auth/password', { method: 'POST', cookie: ck, body: { current: '4827', next: '9034' } }); assert.equal(r.status, 200);
+  r = await call(env, '/api/auth/login', { method: 'POST', body: { password: '9034' } }); assert.equal(r.status, 200);
 });
 test('worker: missing KV binding gives a clear error', async () => {
   const r = await worker.fetch(new Request('https://x.example/'), { ASSETS: {} }); assert.equal(r.status, 500); assert.match((await r.json()).error, /KV/);
