@@ -207,6 +207,19 @@ table.grid { width: 100%; border-collapse: separate; border-spacing: 0; font-siz
 .vcell { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .vpill { display: inline-flex; align-items: center; border: 1.5px solid #000; border-radius: 8px; padding: 2px 9px; font-weight: 600; font-size: 13px; white-space: nowrap; background: var(--cream); }
 .vpill.bbt { background: var(--sky); }
+.stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.key .keyp { margin: -4px 0 10px; font-size: 12.5px; }
+.kcols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.ksec { border: 1.5px solid var(--line); border-radius: 14px; padding: 10px 12px 8px; min-width: 0; }
+.ksec.fv { border-top: 4px solid var(--teal, #47D7AC); } .ksec.bbt { border-top: 4px solid var(--purple, #7566A0); }
+.ksec h3 { margin: 0 0 6px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.ksec ul, .kassume ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.75; }
+.ksec li { margin: 2px 0; }
+.ksec li::marker, .kassume li::marker { color: var(--ink-3); }
+input.rn { width: 54px; padding: 3px 6px; text-align: center; font-weight: 700; border-radius: 8px; }
+input.rt { width: 78px; padding: 3px 6px; font-weight: 600; border-radius: 8px; }
+.kassume { margin-top: 12px; font-size: 13px; }
+.kassume summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
 .dc { display: flex; align-items: center; gap: 6px; }
 .sipin { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; }
 .sipin input.d { width: 140px; }

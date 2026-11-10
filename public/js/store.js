@@ -1,6 +1,6 @@
 // State, saving and syncing. No DOM building here (see views.js / app.js).
 // Edits are applied locally straight away ("pending"), then sent to the Worker in batches.
-import { applyOps, emptyDb } from './ops.js';
+import { applyOps, emptyDb, rulesOf } from './ops.js';
 import { todayISO, uid, parseList, yearOf, fvYear, bbtYear, recomputeCounts } from './rules.js';
 export { uid, todayISO };
 
@@ -50,7 +50,7 @@ export const ready = () => S.server !== null;
 
 export function config() {
   const c = db().cfg;
-  return { fvs: parseList(c.fvs), bbts: parseList(c.bbts), dme: parseList(c.dme), raw: c };
+  return { fvs: parseList(c.fvs), bbts: parseList(c.bbts), dme: parseList(c.dme), rules: rulesOf(c), raw: c };
 }
 export function years() {
   const d = db(), set = new Set([Number(todayISO().slice(0, 4)), S.ui.year]);

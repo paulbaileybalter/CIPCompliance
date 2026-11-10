@@ -4,6 +4,7 @@ import { overview, fvView, bbtView, I } from './views.js';
 import { fvStatus, bbtStatus, addDays, mondayOf, fmtDate, fmtDateY, parseList, fvYear, bbtYear } from './rules.js';
 import { detectKind, parseBoard, parseLegacy } from './board.js';
 import { planBoardImport, planLegacyImport } from './merge.js';
+import { DEFAULT_RULES } from './ops.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $('#app');
@@ -62,10 +63,17 @@ function setField(el) {
   (t === 'fv' ? putFv : putBbt)(next);
 }
 
+function saveRule(el) {
+  const k = el.dataset.rule;
+  if (el.dataset.act === 'ruletext') dispatch({ op: 'cfg', set: { [k]: el.value } });
+  else if (el.value.trim() !== '' && Number.isInteger(Number(el.value))) dispatch({ op: 'cfg', set: { [k]: Number(el.value) } });
+  else hooks.render();                                                  // empty / invalid: snap back
+}
 document.addEventListener('change', (e) => {
   const el = e.target.closest('[data-act]');
   if (!el) return;
   if (el.dataset.act === 'set') setField(el);
+  else if (el.dataset.act === 'rule' || el.dataset.act === 'ruletext') saveRule(el);
   else if (el.dataset.act === 'year') setUi({ year: Number(el.value), limit: 300 });
 });
 
@@ -86,6 +94,7 @@ document.addEventListener('click', (e) => {
     case 'goto': setUi({ view: d.view, q: d.q || '', fvFilter: 'all', bbtFilter: 'all', limit: 300 }); window.scrollTo(0, 0); break;
     case 'filter': { const k = d.t === 'fv' ? 'fvFilter' : 'bbtFilter'; setUi({ [k]: S.ui[k] === d.v ? 'all' : d.v, limit: 300 }); break; }
     case 'today': { const rec = (d.t === 'fv' ? findFv : findBbt)(d.id); if (rec) (d.t === 'fv' ? putFv : putBbt)(editField(d.t, rec, d.f, todayISO())); break; }
+    case 'rules-reset': dispatch({ op: 'cfg', set: { ...DEFAULT_RULES } }); toast('Limits reset to the workbook’s values'); break;
     case 'del': removeRecord(d.t, d.id); break;
     case 'more': setUi({ limit: 1e9 }); break;
     case 'browse': $('#file').click(); break;
@@ -326,10 +335,10 @@ function exportCsv(kind) {
   let head, rows;
   if (kind === 'fv') {
     head = ['FV', 'CIP Date', 'SIP Date', 'Brew Date', 'Beer', 'Time between CIP/SIP & fill', 'Time between SIP & fill', 'Compliant'];
-    rows = db().fv.filter((r) => fvYear(r) === year).sort((a, b) => ((a.brew || a.cip) < (b.brew || b.cip) ? -1 : 1)).map((r) => { const s = fvStatus(r, today); return [r.fv, r.cip, r.sip, r.brew, r.recipe, s.f, s.g, s.state === 'need' || s.state === 'wait' ? '' : s.label]; });
+    rows = db().fv.filter((r) => fvYear(r) === year).sort((a, b) => ((a.brew || a.cip) < (b.brew || b.cip) ? -1 : 1)).map((r) => { const s = fvStatus(r, today, cfg.rules); return [r.fv, r.cip, r.sip, r.brew, r.recipe, s.f, s.g, s.state === 'need' || s.state === 'wait' ? '' : s.label]; });
   } else {
     head = ['BBT', 'Type', 'Acid CIP Date', 'Number of acid CIPs', 'Transfer Date', 'From FV', 'Beer', 'Time between CIP and fill', 'Ready to Fill?'];
-    rows = db().bbt.filter((r) => bbtYear(r) === year).sort((a, b) => ((a.transfer || a.acidCip) < (b.transfer || b.acidCip) ? -1 : 1)).map((r) => { const s = bbtStatus(r, cfg.dme, today); return [r.bbt, s.dme ? 'DME' : 'Krones', r.acidCip, r.acidCount, r.transfer, r.fromFv, r.batch, s.n, s.state === 'need' || s.state === 'wait' ? '' : s.label]; });
+    rows = db().bbt.filter((r) => bbtYear(r) === year).sort((a, b) => ((a.transfer || a.acidCip) < (b.transfer || b.acidCip) ? -1 : 1)).map((r) => { const s = bbtStatus(r, cfg.dme, today, cfg.rules); return [r.bbt, s.dme ? 'DME' : 'Krones', r.acidCip, r.acidCount, r.transfer, r.fromFv, r.batch, s.n, s.state === 'need' || s.state === 'wait' ? '' : s.label]; });
   }
   const csv = '﻿' + [head, ...rows].map((r) => r.map(q).join(',')).join('\r\n');
   const a = document.createElement('a');

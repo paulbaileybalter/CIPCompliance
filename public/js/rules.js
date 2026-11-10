@@ -1,6 +1,8 @@
 // Compliance rules, date helpers. Pure functions — no DOM, no network (also unit-tested in Node).
 // The rules mirror the "FV/BBT CIP Compliance 26" tab of the Vessel & Equipment CIP monitoring workbook.
 
+import { DEFAULT_RULES } from './ops.js';
+
 export const DAY = 86400000;
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -42,31 +44,32 @@ export function parseList(text) {
    G = brew date − SIP date        green < 3 days (3 days is OK only if F is also 3: "<72 hours since CIP")
    Compliant: F < 8 and G < 3  → Yes;   F = 3 and G = 3 → "Yes <72 hours since CIP";  otherwise No.
    States: ok | ok72 | bad | need (missing CIP/SIP) | wait (CIP'd, no brew date yet) | check (dates out of order) */
-export function fvStatus(r, today) {
+export function fvStatus(r, today, rules = DEFAULT_RULES) {
   const f = diffDays(r.brew, r.cip);
   const g = diffDays(r.brew, r.sip);
   const planned = !!r.brew && !!today && r.brew > today;
   const base = { f, g, planned, fTone: '', gTone: '', reasons: [] };
+  const notDue = !!r.brew && !!today && r.brew >= today;        // data can't be entered ahead of time, so only past brews raise "needs data"
   if (!r.brew) {
     return { ...base, state: 'wait', label: r.cip || r.sip ? 'Awaiting brew' : 'No data', missing: [!r.cip && 'CIP', !r.sip && 'SIP'].filter(Boolean) };
   }
   if (!r.cip || !r.sip) {
     const missing = [!r.cip && 'CIP', !r.sip && 'SIP'].filter(Boolean);
-    return { ...base, state: 'need', label: `Needs ${missing.join(' + ')}`, missing,
-      fTone: r.cip ? (f < 8 ? 'ok' : 'bad') : '', gTone: r.sip ? (g < 3 ? 'ok' : 'bad') : '' };
+    return { ...base, state: notDue ? 'wait' : 'need', label: notDue ? 'Not due yet' : `Needs ${missing.join(' + ')}`, missing,
+      fTone: r.cip ? (f < rules.fvCip ? 'ok' : 'bad') : '', gTone: r.sip ? (g < rules.fvSip ? 'ok' : 'bad') : '' };
   }
   if (f < 0 || g < 0) return { ...base, state: 'check', label: 'Check dates', reasons: ['CIP/SIP date is after the brew date'], missing: [] };
-  const fOk = f < 8;
-  const gOk = g < 3;
-  const gOk72 = g === 3 && f === 3;
+  const fOk = f < rules.fvCip;
+  const gOk = g < rules.fvSip;
+  const gOk72 = rules.fvAlt > 0 && g === rules.fvAlt && f === rules.fvAlt;
   base.fTone = fOk ? 'ok' : 'bad';
   base.gTone = gOk || gOk72 ? 'ok' : 'bad';
   if (fOk && gOk) return { ...base, state: 'ok', label: 'Yes', missing: [] };
-  if (f === 3 && g === 3) return { ...base, state: 'ok72', label: 'Yes · <72 h since CIP', missing: [] };
-  if (!fOk) base.reasons.push(`CIP is ${f} days before ${planned ? 'the planned ' : ''}fill (limit: under 8)`);
-  if (!gOk) base.reasons.push(`SIP is ${g} days before ${planned ? 'the planned ' : ''}fill (limit: under 3)`);
+  if (gOk72) return { ...base, state: 'ok72', label: 'Yes · <72 h since CIP', missing: [] };
+  if (!fOk) base.reasons.push(`CIP is ${f} days before ${planned ? 'the planned ' : ''}fill (limit: under ${rules.fvCip})`);
+  if (!gOk) base.reasons.push(`SIP is ${g} days before ${planned ? 'the planned ' : ''}fill (limit: under ${rules.fvSip})`);
   // A brew that hasn't happened yet isn't a breach — the vessel just needs cleaning again closer to the day.
-  if (planned) return { ...base, state: 'need', label: 'CIP/SIP too early', missing: [] };
+  if (planned) return { ...base, state: 'wait', label: 'CIP/SIP too early', missing: [] };
   return { ...base, state: 'bad', label: 'No', missing: [] };
 }
 
@@ -74,27 +77,28 @@ export function fvStatus(r, today) {
    N = transfer date − acid CIP date   green < 3 days. Over that: purple (acceptable) for DME BBTs, flagged for Krones BBTs.
    L = number of acid CIPs / beer fills   6 pale yellow · 7 yellow · 8+ orange (must be re-cleaned)
    Ready to fill: L < 8 (Krones BBTs also need N < 3: "must be green" for Krones). */
-export function bbtStatus(r, dmeList, today) {
+export function bbtStatus(r, dmeList, today, rules = DEFAULT_RULES) {
   const dme = dmeList.includes(r.bbt);
   const n = diffDays(r.transfer, r.acidCip);
   const count = r.acidCount === null || r.acidCount === undefined || r.acidCount === '' ? null : Number(r.acidCount);
   const planned = !!r.transfer && !!today && r.transfer > today;
-  const countTone = count === null ? '' : count >= 8 ? 'bad' : count === 7 ? 'warn2' : count === 6 ? 'warn1' : '';
+  const countTone = count === null ? '' : count >= rules.cntMax ? 'bad' : count >= rules.cntWarn2 ? 'warn2' : count >= rules.cntWarn1 ? 'warn1' : '';
   const base = { n, count, dme, planned, nTone: '', countTone, reasons: [] };
+  const notDue = !!r.transfer && !!today && r.transfer >= today;   // only past transfers raise "needs data"
   if (!r.transfer) {
     return { ...base, state: 'wait', label: r.acidCip ? 'Awaiting transfer' : 'No data', missing: [!r.acidCip && 'acid CIP', count === null && 'count'].filter(Boolean) };
   }
   const missing = [!r.acidCip && 'acid CIP', count === null && 'fill count'].filter(Boolean);
-  if (!r.acidCip) return { ...base, state: 'need', label: `Needs ${missing.join(' + ')}`, missing };
+  if (!r.acidCip) return { ...base, state: notDue ? 'wait' : 'need', label: notDue ? 'Not due yet' : `Needs ${missing.join(' + ')}`, missing };
   if (n < 0) return { ...base, state: 'check', label: 'Check dates', reasons: ['Acid CIP date is after the transfer date'], missing };
-  base.nTone = n < 3 ? 'ok' : dme ? 'dme' : 'bad';
-  if (count === null) return { ...base, state: 'need', label: 'Needs fill count', missing };
+  base.nTone = n < rules.bbtDays ? 'ok' : dme ? 'dme' : 'bad';
+  if (count === null) return { ...base, state: notDue ? 'wait' : 'need', label: notDue ? 'Not due yet' : 'Needs fill count', missing };
   const reasons = [];
-  if (count >= 8) reasons.push(`${count} acid CIPs/fills — limit is under 8`);
-  if (!dme && n >= 3) reasons.push(`Acid CIP was ${n} days before transfer — Krones BBTs need under 3`);
-  if (reasons.length && planned) return { ...base, state: 'need', label: count >= 8 ? 'Acid CIP due' : 'Acid CIP too early', reasons, missing: [] };
+  if (count >= rules.cntMax) reasons.push(`${count} acid CIPs/fills — limit is under ${rules.cntMax}`);
+  if (!dme && n >= rules.bbtDays) reasons.push(`Acid CIP was ${n} days before transfer — Krones BBTs need under ${rules.bbtDays}`);
+  if (reasons.length && planned) return { ...base, state: 'wait', label: count >= rules.cntMax ? 'Acid CIP due' : 'Acid CIP too early', reasons, missing: [] };
   if (reasons.length) return { ...base, state: 'bad', label: 'No', reasons, missing: [] };
-  return { ...base, state: dme && n >= 3 ? 'ok-dme' : 'ok', label: 'Yes', missing: [] };
+  return { ...base, state: dme && n >= rules.bbtDays ? 'ok-dme' : 'ok', label: 'Yes', missing: [] };
 }
 
 export const isGood = (s) => s.state === 'ok' || s.state === 'ok72' || s.state === 'ok-dme';

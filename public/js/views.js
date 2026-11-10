@@ -54,8 +54,8 @@ function glass(pct, id) {
 /* ---------- data selection ---------- */
 function ctx() {
   const d = db(), cfg = config(), today = todayISO(), year = S.ui.year;
-  const fvAll = d.fv.map((r) => ({ r, s: fvStatus(r, today) }));
-  const bbtAll = d.bbt.map((r) => ({ r, s: bbtStatus(r, cfg.dme, today) }));
+  const fvAll = d.fv.map((r) => ({ r, s: fvStatus(r, today, cfg.rules) }));
+  const bbtAll = d.bbt.map((r) => ({ r, s: bbtStatus(r, cfg.dme, today, cfg.rules) }));
   return { d, cfg, today, year, fvAll, bbtAll, fv: fvAll.filter((x) => fvYear(x.r) === year), bbt: bbtAll.filter((x) => bbtYear(x.r) === year) };
 }
 const sortKey = (x, k) => x.r[k] || '9999-12-31';
@@ -74,11 +74,12 @@ const yearSelect = () => `<label class="yearsel"><span>Year</span><select data-a
 export function overview() {
   const c = ctx();
   const empty = !c.d.fv.length && !c.d.bbt.length;
-  const fvSum = summarise(c.fv.map((x) => x.r), (r) => fvStatus(r, c.today));
-  const bbtSum = summarise(c.bbt.map((x) => x.r), (r) => bbtStatus(r, c.cfg.dme, c.today));
+  const fvSum = summarise(c.fv.map((x) => x.r), (r) => fvStatus(r, c.today, c.cfg.rules));
+  const bbtSum = summarise(c.bbt.map((x) => x.r), (r) => bbtStatus(r, c.cfg.dme, c.today, c.cfg.rules));
   return `
   ${empty ? dropzone(c, empty) : ''}
   <section class="grid2">
+    <div class="stack">
     <div class="card meters">
       <div class="card-h"><h2>Compliance in ${c.year}</h2>${yearSelect()}</div>
       <div class="glasses">
@@ -86,6 +87,8 @@ export function overview() {
         ${meter('bbt', 'Brite tanks', bbtSum, 'g2')}
       </div>
       ${empty ? '' : dropzone(c, empty)}
+    </div>
+    ${keyCard(c)}
     </div>
     <div class="card attn">
       <div class="card-h"><h2>Needs a CIP / SIP entry</h2></div>
@@ -100,6 +103,46 @@ export function overview() {
   </section>`;
 }
 const extraVessels = (all, key, known) => [...new Set(all.map((x) => x.r[key]))].filter((n) => !known.includes(n)).sort((a, b) => a - b);
+
+/* ---------- the key: every rule and assumption, editable ---------- */
+const rin = (k, v, min = 1, max = 60) => `<input class="rn" type="number" min="${min}" max="${max}" inputmode="numeric" value="${v}" data-act="rule" data-k="rule:${k}" data-rule="${k}" aria-label="${k}">`;
+function keyCard(c) {
+  const r = c.cfg.rules;
+  return `<div class="card key">
+    <div class="card-h"><h2>Key &amp; rules</h2><button class="btn small" type="button" data-act="rules-reset" title="Put every limit back to the workbook’s values">Reset</button></div>
+    <p class="muted keyp">Change any number and every status, tile and alert updates straight away.</p>
+    <div class="kcols">
+      <section class="ksec fv">
+        <h3>${vpill('fv', '')} Fermenters</h3>
+        <ul>
+          <li>CIP done fewer than ${rin('fvCip', r.fvCip)} days before the brew date</li>
+          <li>SIP done fewer than ${rin('fvSip', r.fvSip)} days before the brew date</li>
+          <li>Exception: a CIP and SIP both exactly ${rin('fvAlt', r.fvAlt, 0)} days before still pass as “&lt;72 h since CIP” <span class="muted">(0 = no exception)</span></li>
+          <li class="muted">Both met = compliant (green). A brew that has already happened with a limit missed = “No”.</li>
+        </ul>
+      </section>
+      <section class="ksec bbt">
+        <h3>${vpill('bbt', '')} Brite tanks</h3>
+        <ul>
+          <li>Clean (acid CIP/SIP or CIP) done fewer than ${rin('bbtDays', r.bbtDays)} days before the transfer = green</li>
+          <li>Over that: <span class="tag dme">DME</span> tanks <input class="rt" type="text" value="${esc(c.d.cfg.dme)}" data-act="ruletext" data-k="rule:dme" data-rule="dme" aria-label="DME tank numbers" title="BBT numbers, e.g. 3-6"> are fine (purple); all other (<span class="tag krones">Krones</span>) tanks are flagged</li>
+          <li>Count of acid CIP/SIPs since the last CIP: <b class="cw1">${rin('cntWarn1', r.cntWarn1, 0, 99)}</b> caution · <b class="cw2">${rin('cntWarn2', r.cntWarn2, 0, 99)}</b> warning · <b class="cw3">${rin('cntMax', r.cntMax, 1, 99)}</b> must be cleaned</li>
+          <li>Ready to fill = count below ${r.cntMax} <span class="muted">(Krones tanks also need the green clean window)</span></li>
+          <li class="muted">Count: each acid CIP/SIP between brews adds 1; a caustic CIP with its SIP resets it to 0.</li>
+        </ul>
+      </section>
+    </div>
+    <details class="kassume"><summary>How the data is worked out</summary>
+      <ul>
+        <li>FV rows come from brews on the Live Brewery Board (FV/FMT); BBT rows come from its Transfer lines. Brew and transfer dates are filled in for you; CIP, SIP and count are entered here.</li>
+        <li>Two brews on the same FV within 2 days are one fill (the first day). Two transfers into the same BBT on one day are one fill.</li>
+        <li>“Needs data” only appears for brews and transfers dated before today; anything dated today or later shows “Not due yet”, because nothing can be entered ahead of time.</li>
+        <li>BBT limits are measured from the first clean date on the row (the CIP date, or the acid CIP/SIP date).</li>
+        <li>Re-importing the board never overwrites dates you typed. Vessel lists are under the cog.</li>
+      </ul>
+    </details>
+  </div>`;
+}
 
 function legend() {
   return [['ok', 'Compliant'], ['bad', 'Not compliant'], ['need', 'Needs CIP/SIP'], ['wait', 'CIP’d, awaiting fill'], ['idle', 'No record']]
@@ -137,7 +180,7 @@ function attention(c) {
     ...fv.map((x) => ({ date: x.r.brew, html: fvAttn(x, c) })),
     ...bbt.map((x) => ({ date: x.r.transfer, html: bbtAttn(x, c) })),
   ].sort((a, b) => (a.date < b.date ? -1 : 1));
-  if (!items.length) return `<div class="allgood">${I.check}<div><b>All caught up.</b><span class="muted">Every recent and upcoming brew and transfer has its CIP/SIP data.</span></div></div>`;
+  if (!items.length) return `<div class="allgood">${I.check}<div><b>All caught up.</b><span class="muted">Every brew and transfer so far has its CIP/SIP data.</span></div></div>`;
   const older = c.fvAll.filter((x) => x.s.state === 'need' && x.r.brew < limit).length + c.bbtAll.filter((x) => x.s.state === 'need' && x.r.transfer < limit).length;
   const shown = items.slice(0, 14);
   return `<div class="att-list">${shown.map((i) => i.html).join('')}</div>
@@ -205,7 +248,7 @@ const passFilter = (f, s) => f === 'all' || (f === 'good' ? isGood(s) : s.state 
 
 export function fvView() {
   const c = ctx();
-  const sum = summarise(c.fv.map((x) => x.r), (r) => fvStatus(r, c.today));
+  const sum = summarise(c.fv.map((x) => x.r), (r) => fvStatus(r, c.today, c.cfg.rules));
   const counts = { all: sum.total, good: sum.good, bad: sum.bad, need: sum.need, wait: sum.wait };
   const f = S.ui.fvFilter;
   const rows = c.fv.filter((x) => passFilter(f, x.s) && matchQ(x, S.ui.q, { num: ['fv'], txt: ['recipe', 'note'] })).sort(byDateDesc('brew'));
@@ -214,7 +257,7 @@ export function fvView() {
   ${tiles(FV_FILTERS, counts, f, 'fv', sum)}
   ${toolbar('fv', rows.length, c.fv.length)}
   <div class="card tablecard"><div class="tscroll"><table class="grid fvt">
-    <thead><tr><th>FV</th><th>CIP date</th><th>SIP date</th><th>Brew date</th><th>Beer</th><th class="c" title="Brew date − CIP date. Under 8 days.">CIP → fill<small>days</small></th><th class="c" title="Brew date − SIP date. Under 3 days.">SIP → fill<small>days</small></th><th>Compliant</th><th class="act"></th></tr></thead>
+    <thead><tr><th>FV</th><th>CIP date</th><th>SIP date</th><th>Brew date</th><th>Beer</th><th class="c" title="Brew date − CIP date. Under ${c.cfg.rules.fvCip} days.">CIP → fill<small>days</small></th><th class="c" title="Brew date − SIP date. Under ${c.cfg.rules.fvSip} days.">SIP → fill<small>days</small></th><th>Compliant</th><th class="act"></th></tr></thead>
     <tbody>${shown.map(({ r, s }) => `<tr class="row ${s.state}${s.planned ? ' planned' : ''}" data-id="${r.id}">
       <td data-l="Vessel">${vpill('fv', r.fv)}</td>
       <td data-l="CIP date">${dateCell('fv', r.id, 'cip', r.cip, `FV ${r.fv} CIP date`)}</td>
@@ -234,7 +277,7 @@ export function fvView() {
 const BBT_FILTERS = [['all', 'Fills'], ['good', 'Ready / OK'], ['bad', 'Not OK'], ['need', 'Needs data'], ['wait', 'Awaiting transfer']];
 export function bbtView() {
   const c = ctx();
-  const sum = summarise(c.bbt.map((x) => x.r), (r) => bbtStatus(r, c.cfg.dme, c.today));
+  const sum = summarise(c.bbt.map((x) => x.r), (r) => bbtStatus(r, c.cfg.dme, c.today, c.cfg.rules));
   const counts = { all: sum.total, good: sum.good, bad: sum.bad, need: sum.need, wait: sum.wait };
   const f = S.ui.bbtFilter;
   const rows = c.bbt.filter((x) => passFilter(f, x.s) && matchQ(x, S.ui.q, { num: ['bbt', 'fromFv'], txt: ['batch', 'note'] })).sort(byDateDesc('transfer'));
@@ -243,7 +286,7 @@ export function bbtView() {
   ${tiles(BBT_FILTERS, counts, f, 'bbt', sum)}
   ${toolbar('bbt', rows.length, c.bbt.length)}
   <div class="card tablecard"><div class="tscroll"><table class="grid bbtt">
-    <thead><tr><th>BBT</th><th>Clean date<small>acid CIP/SIP · CIP</small></th><th class="c" title="Calculated: each acid CIP/SIP adds 1 and a caustic CIP resets it to 0 (pick Acid or CIP beside the date; a CIP also takes its SIP date). Type over it to set it by hand. 6 = caution, 7 = warning, 8 = must be cleaned.">Acid CIPs<small>count</small></th><th>Transfer date</th><th>From FV · beer</th><th class="c" title="Transfer date − acid CIP date. Under 3 days is green; purple is acceptable for DME BBTs.">CIP → fill<small>days</small></th><th title="Needs fewer than 8 acid CIPs. Krones BBTs must also be green in CIP → fill.">Ready to fill?</th><th class="act"></th></tr></thead>
+    <thead><tr><th>BBT</th><th>Clean date<small>acid CIP/SIP · CIP</small></th><th class="c" title="Calculated: each acid CIP/SIP adds 1 and a caustic CIP resets it to 0 (pick Acid or CIP beside the date; a CIP also takes its SIP date). Type over it to set it by hand. ${c.cfg.rules.cntWarn1} = caution, ${c.cfg.rules.cntWarn2} = warning, ${c.cfg.rules.cntMax} = must be cleaned.">Acid CIPs<small>count</small></th><th>Transfer date</th><th>From FV · beer</th><th class="c" title="Transfer date − clean date. Under ${c.cfg.rules.bbtDays} days is green; purple is acceptable for DME BBTs.">CIP → fill<small>days</small></th><th title="Needs fewer than ${c.cfg.rules.cntMax} acid CIPs/fills since the last CIP. Krones BBTs must also be green in CIP → fill.">Ready to fill?</th><th class="act"></th></tr></thead>
     <tbody>${shown.map(({ r, s }) => `<tr class="row ${s.state}${s.planned ? ' planned' : ''}" data-id="${r.id}">
       <td data-l="Vessel"><div class="vcell">${vpill('bbt', r.bbt)}<span class="tag ${s.dme ? 'dme' : 'krones'}">${s.dme ? 'DME' : 'Krones'}</span></div></td>
       <td data-l="Clean date">${bbtDate(r)}</td>

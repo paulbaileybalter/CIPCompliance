@@ -54,3 +54,9 @@ If the site already had data in it when you deployed (so the seed didn't auto-lo
 Next to each BBT clean date pick **Acid** (the acid CIP/SIP done between brews: count = previous count + 1) or **CIP**
 (caustic CIP, which also takes its SIP date: count resets to 0). The count is filled in for you and follows later edits. Typing a count by hand switches
 that row back to manual. Older migrated rows keep their counts and are the starting point.
+
+## Key & rules (editable)
+
+The Overview has a **Key & rules** card under the compliance tile. FV: days CIP and SIP must be before the brew, and the
+"<72 h" exception. BBT: days before transfer, which tanks are DME, and the count caution/warning/must-clean levels.
+Changes apply to every status, tile and alert immediately and are saved with the data (Reset restores the workbook's values).

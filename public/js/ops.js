@@ -5,7 +5,11 @@
 //   acidType: 'cip' (caustic CIP: count resets to 0), 'sip' (the acid CIP/SIP done between brews: count + 1) or '' (count typed by hand / migrated).
 //   bsrc/tsrc say where the brew/transfer date came from: 'board' (Live Brewery Board), 'sheet' (migrated spreadsheet) or ''.
 
-export const DEFAULT_CFG = { fvs: '1-12, 14-28, 31, 35-60', bbts: '1-8', dme: '3-6' };
+// The compliance limits ("the key" on the Overview). All editable; days are whole numbers.
+export const RULE_LIMITS = { fvCip: [1, 60], fvSip: [1, 60], fvAlt: [0, 60], bbtDays: [1, 60], cntWarn1: [0, 99], cntWarn2: [0, 99], cntMax: [1, 99] };
+export const DEFAULT_RULES = { fvCip: 8, fvSip: 3, fvAlt: 3, bbtDays: 3, cntWarn1: 6, cntWarn2: 7, cntMax: 8 };
+export const DEFAULT_CFG = { fvs: '1-12, 14-28, 31, 35-60', bbts: '1-8', dme: '3-6', ...DEFAULT_RULES };
+export const rulesOf = (cfg) => Object.fromEntries(Object.keys(DEFAULT_RULES).map((k) => [k, Number.isInteger(cfg?.[k]) ? cfg[k] : DEFAULT_RULES[k]]));
 export const emptyDb = () => ({ ver: '', fv: [], bbt: [], cfg: { ...DEFAULT_CFG }, meta: {} });
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -50,7 +54,8 @@ export function applyOps(db, ops) {
       const list = db[op.t], map = ix(op.t), at = map.get(str(op.id, 40));
       if (at !== undefined && list[at]) { list[at] = null; map.delete(str(op.id, 40)); applied++; }
     } else if (op.op === 'cfg' && op.set && typeof op.set === 'object') {
-      for (const k of Object.keys(DEFAULT_CFG)) if (typeof op.set[k] === 'string' && LIST_OK.test(op.set[k])) db.cfg[k] = op.set[k].trim();
+      for (const k of ['fvs', 'bbts', 'dme']) if (typeof op.set[k] === 'string' && LIST_OK.test(op.set[k])) db.cfg[k] = op.set[k].trim();
+      for (const [k, [lo, hi]] of Object.entries(RULE_LIMITS)) { const n = op.set[k]; if (Number.isInteger(n) && n >= lo && n <= hi) db.cfg[k] = n; }
       applied++;
     } else if (op.op === 'meta' && op.set && typeof op.set === 'object') {
       const li = op.set.lastImport;

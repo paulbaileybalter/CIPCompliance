@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import { fvStatus, bbtStatus, parseList, summarise, addDays, mondayOf, diffDays, recomputeCounts } from '../public/js/rules.js';
-import { applyOps, emptyDb } from '../public/js/ops.js';
+import { DEFAULT_RULES, rulesOf, applyOps, emptyDb } from '../public/js/ops.js';
 import { planBoardImport, planLegacyImport } from '../public/js/merge.js';
 import { parseWeek, parseBoard, parseLegacy, detectKind } from '../public/js/board.js';
 import worker from '../src/worker.js';
@@ -40,9 +40,11 @@ test('BBT count: acid CIP resets to 0, acid SIP adds 1, hand-typed rows are the 
   assert.equal(clean('cip'), 'cip'); assert.equal(clean('x'), '');
 });
 test('FV states: need / wait / check / planned', () => {
-  assert.equal(fvStatus({ brew: '2026-11-11', cip: '', sip: '' }, T).state, 'need');
-  assert.equal(fvStatus({ brew: '2026-11-11', cip: '', sip: '' }, T).label, 'Needs CIP + SIP');
-  assert.equal(fvStatus({ brew: '2026-11-11', cip: '2026-11-09', sip: '' }, T).label, 'Needs SIP');
+  assert.equal(fvStatus({ brew: '2026-11-08', cip: '', sip: '' }, T).state, 'need');
+  assert.equal(fvStatus({ brew: '2026-11-08', cip: '', sip: '' }, T).label, 'Needs CIP + SIP');
+  assert.equal(fvStatus({ brew: '2026-11-08', cip: '2026-11-07', sip: '' }, T).label, 'Needs SIP');
+  // today and future brews never raise "needs data" - nothing can be entered ahead of time
+  for (const brew of ['2026-11-10', '2026-11-11', '2026-12-01']) { const s = fvStatus({ brew, cip: '', sip: '' }, T); assert.equal(s.state, 'wait'); assert.equal(s.label, 'Not due yet'); }
   assert.equal(fvStatus({ brew: '', cip: '2026-11-09', sip: '' }, T).state, 'wait');
   assert.equal(fvStatus({ brew: '2026-11-01', cip: '2026-11-02', sip: '2026-11-02' }, T).state, 'check');
   assert.equal(fvStatus({ brew: '2026-11-11', cip: '2026-11-10', sip: '2026-11-10' }, T).planned, true);
@@ -52,12 +54,26 @@ test('FV boundary: CIP 7 days ok, 8 days bad; SIP 2 days ok, 3 days bad', () => 
   const mk = (F, G) => fvStatus({ fv: 1, brew: '2026-06-20', cip: addDays('2026-06-20', -F), sip: addDays('2026-06-20', -G) }, T).state;
   assert.equal(mk(7, 2), 'ok'); assert.equal(mk(8, 2), 'bad'); assert.equal(mk(5, 3), 'bad'); assert.equal(mk(3, 3), 'ok72');
 });
+test('editable limits: FV/BBT rules follow the key, cfg op validates', () => {
+  const R = { ...DEFAULT_RULES, fvCip: 5, fvSip: 2, fvAlt: 0, bbtDays: 2, cntMax: 5, cntWarn1: 3, cntWarn2: 4 };
+  const fv = { brew: '2026-06-20', cip: '2026-06-15', sip: '2026-06-19' };           // CIP 5 days, SIP 1 day
+  assert.equal(fvStatus(fv, T).state, 'ok'); assert.equal(fvStatus(fv, T, R).state, 'bad');
+  assert.equal(fvStatus({ brew: '2026-06-20', cip: '2026-06-17', sip: '2026-06-17' }, T).state, 'ok72');
+  assert.equal(fvStatus({ brew: '2026-06-20', cip: '2026-06-17', sip: '2026-06-17' }, T, { ...R, fvCip: 8, fvSip: 3, fvAlt: 0 }).state, 'bad', 'exception can be switched off');
+  const bb = { bbt: 8, acidCip: '2026-06-18', transfer: '2026-06-20', acidCount: 4 };  // Krones, 2 days, count 4
+  assert.equal(bbtStatus(bb, [3, 4], T).state, 'ok'); assert.equal(bbtStatus(bb, [3, 4], T, R).state, 'bad');
+  assert.equal(bbtStatus({ ...bb, acidCount: 5, acidCip: '2026-06-19' }, [3, 4], T, R).state, 'bad', 'count at the limit');
+  assert.equal(bbtStatus({ ...bb, acidCount: 3, acidCip: '2026-06-19' }, [3, 4], T, R).countTone, 'warn1');
+  const db = emptyDb(); applyOps(db, [{ op: 'cfg', set: { fvCip: 6, fvSip: 'x', cntMax: 500, bbtDays: 2.5, fvAlt: 0 } }]);
+  assert.deepEqual([db.cfg.fvCip, db.cfg.fvSip, db.cfg.cntMax, db.cfg.bbtDays, db.cfg.fvAlt], [6, 3, 8, 3, 0]);
+  assert.equal(rulesOf({}).fvCip, 8, 'older databases fall back to the workbook values');
+});
 test('planned rows are never judged early', () => {
   const f = fvStatus({ fv: 1, brew: '2026-11-22', cip: '2026-11-10', sip: '2026-11-10' }, T);
-  assert.equal(f.state, 'need'); assert.equal(f.label, 'CIP/SIP too early'); assert.ok(f.reasons.length);
+  assert.equal(f.state, 'wait'); assert.equal(f.label, 'CIP/SIP too early'); assert.ok(f.reasons.length);
   assert.equal(fvStatus({ fv: 1, brew: '2026-11-10', cip: '2026-11-01', sip: '2026-11-01' }, T).state, 'bad', 'on the day it is judged');
   const b = bbtStatus({ bbt: 8, acidCip: '2026-11-10', transfer: '2026-11-20', acidCount: 2 }, [3, 4, 5, 6], T);
-  assert.equal(b.state, 'need'); assert.equal(b.label, 'Acid CIP too early');
+  assert.equal(b.state, 'wait'); assert.equal(b.label, 'Acid CIP too early');
   assert.equal(bbtStatus({ bbt: 8, acidCip: '2026-11-19', transfer: '2026-11-20', acidCount: 8 }, [3, 4, 5, 6], T).label, 'Acid CIP due');
 });
 test('BBT rules: DME purple, Krones flagged, count thresholds', () => {
@@ -71,7 +87,8 @@ test('BBT rules: DME purple, Krones flagged, count thresholds', () => {
   assert.equal(mk(8, 1, 6).countTone, 'warn1'); assert.equal(mk(8, 1, 7).countTone, 'warn2'); assert.equal(mk(8, 1, 8).countTone, 'bad');
   assert.equal(mk(8, 1, 8).state, 'bad'); assert.equal(mk(8, 1, 7).state, 'ok');
   assert.equal(mk(8, 1, null).state, 'need');
-  assert.equal(bbtStatus({ bbt: 2, acidCip: '', transfer: '2026-11-12', acidCount: null }, dme, T).state, 'need');
+  assert.equal(bbtStatus({ bbt: 2, acidCip: '', transfer: '2026-11-09', acidCount: null }, dme, T).state, 'need');
+  for (const transfer of ['2026-11-10', '2026-11-12']) assert.equal(bbtStatus({ bbt: 2, acidCip: '', transfer, acidCount: null }, dme, T).state, 'wait', 'future / today transfers are not alerts');
   assert.equal(bbtStatus({ bbt: 2, acidCip: '2026-11-09', transfer: '', acidCount: 1 }, dme, T).state, 'wait');
 });
 test('Real-data cross-check: BBT counts/tones vs the sheet conditional formats', () => {
