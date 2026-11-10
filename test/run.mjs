@@ -266,6 +266,20 @@ const call = async (env, path, { method = 'GET', body, cookie, origin } = {}) =>
 };
 const cookieFrom = (res) => (res.headers.get('set-cookie') || '').split(';')[0];
 
+test('worker: history is merged once into an existing database (board rows get their CIP/SIP)', async () => {
+  const seed = { fv: [{ fv: 5, cip: '2026-01-02', sip: '2026-01-03', brew: '2026-01-04' }], bbt: [{ bbt: 3, acidCip: '2026-01-01', acidCount: 2, transfer: '2026-01-10' }] };
+  const env = fakeEnv();
+  env.ASSETS = { async fetch() { return new Response(JSON.stringify(seed)); } };
+  const existing = emptyDb(); existing.ver = 'old';
+  existing.fv.push({ id: 'a1', fv: 5, cip: '', sip: '', brew: '2026-01-04', recipe: 'IPA', note: '', bsrc: 'board' });
+  env.store.set('db', JSON.stringify(existing));
+  const ck = cookieFrom(await call(env, '/api/auth/setup', { method: 'POST', body: { password: '4827' } }));
+  let d = await (await call(env, '/api/db', { cookie: ck })).json();
+  assert.equal(d.fv.length, 1); assert.equal(d.fv[0].cip, '2026-01-02'); assert.equal(d.fv[0].recipe, 'IPA'); assert.equal(d.bbt.length, 1); assert.equal(d.meta.seeded, true);
+  const ver = d.ver;
+  d = await (await call(env, '/api/db', { cookie: ck })).json();
+  assert.equal(d.ver, ver, 'second load does not merge again'); assert.ok(env.store.has('bak:pre-history'));
+});
 test('worker: unauthenticated visitors only get the login page', async () => {
   const env = fakeEnv();
   let r = await call(env, '/'); assert.equal(r.status, 302); assert.equal(r.headers.get('location'), 'https://tracker.example/login');

@@ -8,6 +8,7 @@
 //   bak:YYYY-MM-DD  copy of db before that day's first change (kept 30 days)
 //   rl:<ip>         failed-login counter (15 min)
 import { applyOps, emptyDb } from '../public/js/ops.js';
+import { planLegacyImport } from '../public/js/merge.js';
 
 const SESSION_COOKIE = 'bct';
 const SESSION_TTL = 60 * 60 * 24 * 30;
@@ -116,16 +117,28 @@ async function authRoutes(request, env, url, secure) {
 
 /* ---------------- data routes ---------------- */
 async function loadDb(env) {
-  let db = await env.KV.get('db', 'json');
-  if (!db) {
-    // First use: start from the history baked into the deploy (public/seed.json, behind the password like everything else).
+  const stored = await env.KV.get('db', 'json');
+  const db = stored || emptyDb();
+  db.fv ||= []; db.bbt ||= []; db.cfg = { ...emptyDb().cfg, ...(db.cfg || {}) }; db.meta ||= {};
+  if (!db.meta.seeded) {
+    // Once only: merge the CIP/SIP history baked into the deploy (public/seed.json, behind the PIN like every other file).
+    // Existing rows are matched, never duplicated or overwritten, so it is safe whatever is already in the database.
     try {
       const res = await env.ASSETS.fetch(new Request('https://assets.local/seed.json'));
-      if (res.ok) { db = await res.json(); await env.KV.put('db', JSON.stringify(db)); }
-    } catch {}
-    db ||= emptyDb();
+      if (res.ok) {
+        const seed = await res.json();
+        const pick = (o, ks) => Object.fromEntries(ks.map((k) => [k, o[k]]));
+        const legacy = { sheets: [{ name: 'seed', warnings: [],
+          fv: (seed.fv || []).map((x) => pick(x, ['fv', 'cip', 'sip', 'brew'])),
+          bbt: (seed.bbt || []).map((x) => pick(x, ['bbt', 'acidCip', 'acidCount', 'transfer'])) }] };
+        if (stored && (stored.fv?.length || stored.bbt?.length)) await env.KV.put('bak:pre-history', JSON.stringify(stored));
+        applyOps(db, planLegacyImport(db, legacy).ops);
+        db.meta.seeded = true;
+        db.ver = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        await env.KV.put('db', JSON.stringify(db));
+      }
+    } catch (err) { console.error('seed merge failed', err); }
   }
-  db.fv ||= []; db.bbt ||= []; db.cfg = { ...emptyDb().cfg, ...(db.cfg || {}) }; db.meta ||= {};
   return db;
 }
 
