@@ -37,3 +37,10 @@ npm install
 npm run dev     # wrangler dev (local KV)
 npm test        # parser, merge and rules tests
 ```
+
+## Pre-loaded history
+
+`public/seed.json` holds the CIP/SIP history from the old workbook (2025 + 2026 tabs). The first time the site
+is used with an empty KV store it loads that data automatically. To rebuild it from an updated workbook:
+`node scripts/build-seed.mjs path/to/Vessel_Equipment_CIP_monitoring.xlsx` and redeploy (only affects a fresh KV store).
+It contains your operational data, so keep the GitHub repo **private**.

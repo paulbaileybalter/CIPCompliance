@@ -115,7 +115,15 @@ async function authRoutes(request, env, url, secure) {
 
 /* ---------------- data routes ---------------- */
 async function loadDb(env) {
-  const db = (await env.KV.get('db', 'json')) || emptyDb();
+  let db = await env.KV.get('db', 'json');
+  if (!db) {
+    // First use: start from the history baked into the deploy (public/seed.json, behind the password like everything else).
+    try {
+      const res = await env.ASSETS.fetch(new Request('https://assets.local/seed.json'));
+      if (res.ok) { db = await res.json(); await env.KV.put('db', JSON.stringify(db)); }
+    } catch {}
+    db ||= emptyDb();
+  }
   db.fv ||= []; db.bbt ||= []; db.cfg = { ...emptyDb().cfg, ...(db.cfg || {}) }; db.meta ||= {};
   return db;
 }
