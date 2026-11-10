@@ -79,7 +79,8 @@ export function overview() {
   return `
   ${empty ? dropzone(c, empty) : ''}
   <section class="grid2">
-    <div class="stack">
+    ${keyCard(c)}
+    <div class="stack right">
     <div class="card meters">
       <div class="card-h"><h2>Compliance in ${c.year}</h2>${yearSelect()}</div>
       <div class="glasses">
@@ -88,11 +89,10 @@ export function overview() {
       </div>
       ${empty ? '' : dropzone(c, empty)}
     </div>
-    ${keyCard(c)}
-    </div>
     <div class="card attn">
       <div class="card-h"><h2>Needs a CIP / SIP entry</h2></div>
       ${attention(c)}
+    </div>
     </div>
   </section>
   <section class="card farm">
