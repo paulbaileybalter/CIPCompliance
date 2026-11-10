@@ -59,6 +59,7 @@ export function fvStatus(r, today, rules = DEFAULT_RULES) {
       fTone: r.cip ? (f < rules.fvCip ? 'ok' : 'bad') : '', gTone: r.sip ? (g < rules.fvSip ? 'ok' : 'bad') : '' };
   }
   if (f < 0 || g < 0) return { ...base, state: 'check', label: 'Check dates', reasons: ['CIP/SIP date is after the brew date'], missing: [] };
+  if (r.sip < r.cip) return { ...base, state: 'check', label: 'Check dates', reasons: ['SIP is dated before its CIP — every CIP is followed by a SIP'], missing: [] };
   const fOk = f < rules.fvCip;
   const gOk = g < rules.fvSip;
   const gOk72 = rules.fvAlt > 0 && g === rules.fvAlt && f === rules.fvAlt;
@@ -82,7 +83,7 @@ export function bbtStatus(r, dmeList, today, rules = DEFAULT_RULES) {
   const n = diffDays(r.transfer, r.acidCip);
   const count = r.acidCount === null || r.acidCount === undefined || r.acidCount === '' ? null : Number(r.acidCount);
   const planned = !!r.transfer && !!today && r.transfer > today;
-  const countTone = count === null ? '' : count >= rules.cntMax ? 'bad' : count >= rules.cntWarn2 ? 'warn2' : count >= rules.cntWarn1 ? 'warn1' : '';
+  const countTone = count !== null && count >= rules.cntMax ? 'bad' : '';
   const base = { n, count, dme, planned, nTone: '', countTone, reasons: [] };
   const notDue = !!r.transfer && !!today && r.transfer >= today;   // only past transfers raise "needs data"
   if (!r.transfer) {
@@ -91,12 +92,13 @@ export function bbtStatus(r, dmeList, today, rules = DEFAULT_RULES) {
   const missing = [!r.acidCip && 'acid CIP', count === null && 'fill count'].filter(Boolean);
   if (!r.acidCip) return { ...base, state: notDue ? 'wait' : 'need', label: notDue ? 'Not due yet' : `Needs ${missing.join(' + ')}`, missing };
   if (n < 0) return { ...base, state: 'check', label: 'Check dates', reasons: ['Acid CIP date is after the transfer date'], missing };
+  if (r.acidType === 'cip' && r.acidSip && r.acidSip < r.acidCip) return { ...base, state: 'check', label: 'Check dates', reasons: ['SIP is dated before its CIP — every CIP is followed by a SIP'], missing };
   base.nTone = n < rules.bbtDays ? 'ok' : dme ? 'dme' : 'bad';
   if (count === null) return { ...base, state: notDue ? 'wait' : 'need', label: notDue ? 'Not due yet' : 'Needs fill count', missing };
   const reasons = [];
-  if (count >= rules.cntMax) reasons.push(`${count} acid CIPs/fills — limit is under ${rules.cntMax}`);
-  if (!dme && n >= rules.bbtDays) reasons.push(`Acid CIP was ${n} days before transfer — Krones BBTs need under ${rules.bbtDays}`);
-  if (reasons.length && planned) return { ...base, state: 'wait', label: count >= rules.cntMax ? 'Acid CIP due' : 'Acid CIP too early', reasons, missing: [] };
+  if (count >= rules.cntMax) reasons.push(`${count} fills since the last CIP — limit is under ${rules.cntMax}`);
+  if (!dme && n >= rules.bbtDays) reasons.push(`Clean was ${n} days before transfer — Krones BBTs need under ${rules.bbtDays}`);
+  if (reasons.length && planned) return { ...base, state: 'wait', label: count >= rules.cntMax ? 'CIP due' : 'Acid CIP too early', reasons, missing: [] };
   if (reasons.length) return { ...base, state: 'bad', label: 'No', reasons, missing: [] };
   return { ...base, state: dme && n >= rules.bbtDays ? 'ok-dme' : 'ok', label: 'Yes', missing: [] };
 }

@@ -41,7 +41,7 @@ function render() {
 hooks.render = render;
 
 /* ---------- field edits ---------- */
-// the acid CIP/SIP between brews is the routine entry; a caustic CIP (count back to 0) is the exception, so pick it deliberately
+// the acid CIP after each fill is the routine entry; a CIP (caustic, count back to 0) is the exception, so pick it deliberately
 const defaultAcidType = () => 'sip';
 function editField(t, rec, f, v) {
   if (f === 'acidCount') v = v === '' || v === null ? null : Math.max(0, Math.min(99, Math.round(Number(v))));
@@ -275,7 +275,7 @@ function openLog(kind) {
         <div class="dlg-f"><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="submit">${I.check}<span>Save</span></button></div></form>`
     : `<form id="logForm" class="form">
         <label>Vessel<select name="v" required autofocus><option value="">Choose…</option>${opts}</select></label>
-        <div class="row2"><label>Date<input type="date" name="a" value="${today}"></label><label>What was done<select name="c"><option value="sip">Acid CIP / SIP between brews — count + 1</option><option value="cip">Caustic CIP + SIP — count resets to 0</option></select></label></div>
+        <div class="row2"><label>Date<input type="date" name="a" value="${today}"></label><label>What was done<select name="c"><option value="sip">Acid CIP (after a fill) — count + 1</option><option value="cip">CIP (caustic) + SIP — count resets to 0</option></select></label></div>
         <label id="sipRow" hidden>SIP date <span class="muted">(after the CIP)</span><input type="date" name="d" value="${today}"></label>
         <label>Count <span class="muted">(leave empty to calculate it)</span><input type="number" name="b" min="0" max="99" inputmode="numeric" placeholder="auto"></label>
         <p class="muted">It joins the tank’s next transfer from the Live Brewery Board automatically.</p>

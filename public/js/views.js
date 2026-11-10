@@ -28,7 +28,7 @@ const dateIn = (t, id, f, v, label) => `<input class="d" type="date" value="${es
 const todayBtn = (t, id, f, v) => (v ? '' : `<button type="button" class="today" data-act="today" data-t="${t}" data-id="${id}" data-f="${f}" tabindex="-1">Today</button>`);
 const dateCell = (t, id, f, v, label) => `<div class="dc">${dateIn(t, id, f, v, label)}${todayBtn(t, id, f, v)}</div>`;
 const countIn = (id, v, tone, label) => `<input class="n ${tone || ''}" type="number" min="0" max="99" inputmode="numeric" value="${v === null || v === undefined ? '' : v}" placeholder="–" data-act="set" data-t="bbt" data-id="${id}" data-f="acidCount" data-k="bbt:${id}:acidCount" aria-label="${esc(label)}">`;
-const typeSel = (id, v, bbt) => `<select class="ty" data-act="set" data-t="bbt" data-id="${id}" data-f="acidType" data-k="bbt:${id}:acidType" aria-label="BBT ${bbt}: acid CIP/SIP (adds 1) or caustic CIP (resets to 0)" title="Acid CIP/SIP between brews adds 1 to the count. A caustic CIP (with its SIP) resets it to 0.">${[['', '–'], ['sip', 'Acid'], ['cip', 'CIP']].map(([k, t]) => `<option value="${k}" ${k === (v || '') ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+const typeSel = (id, v, bbt) => `<select class="ty" data-act="set" data-t="bbt" data-id="${id}" data-f="acidType" data-k="bbt:${id}:acidType" aria-label="BBT ${bbt}: acid CIP (adds 1) or CIP (caustic, resets to 0)" title="Acid CIP (acid wash after a fill) adds 1 to the count. A CIP (caustic) resets it to 0.">${[['', '–'], ['sip', 'Acid CIP'], ['cip', 'CIP']].map(([k, t]) => `<option value="${k}" ${k === (v || '') ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
 const bbtDate = (r) => `<div class="dc">${dateIn('bbt', r.id, 'acidCip', r.acidCip, `BBT ${r.bbt} acid CIP or SIP date`)}${todayBtn('bbt', r.id, 'acidCip', r.acidCip)}${typeSel(r.id, r.acidType, r.bbt)}${r.acidType === 'cip' ? `<span class="sipin"><span class="muted">SIP</span>${dateIn('bbt', r.id, 'acidSip', r.acidSip, `BBT ${r.bbt} SIP date after the CIP`)}${todayBtn('bbt', r.id, 'acidSip', r.acidSip)}</span>` : ''}</div>`;
 const vpill = (kind, n) => `<span class="vpill ${kind}">${kind === 'fv' ? 'FV' : 'BBT'} ${n}</span>`;
 const plannedTag = (on) => (on ? '<span class="tag plan" title="Date is in the future (from the board plan)">planned</span>' : '');
@@ -115,20 +115,21 @@ function keyCard(c) {
       <section class="ksec fv">
         <h3>${vpill('fv', '')} Fermenters</h3>
         <ul>
-          <li>CIP done fewer than ${rin('fvCip', r.fvCip)} days before the brew date</li>
-          <li>SIP done fewer than ${rin('fvSip', r.fvSip)} days before the brew date</li>
-          <li>Exception: a CIP and SIP both exactly ${rin('fvAlt', r.fvAlt, 0)} days before still pass as “&lt;72 h since CIP” <span class="muted">(0 = no exception)</span></li>
-          <li class="muted">Both met = compliant (green). A brew that has already happened with a limit missed = “No”.</li>
+          <li>Every CIP (caustic) is followed by a SIP.</li>
+          <li>CIP done fewer than ${rin('fvCip', r.fvCip)} days before the brew date. A tank unfilled for over a week needs a new CIP and SIP.</li>
+          <li>SIP done fewer than ${rin('fvSip', r.fvSip)} days (72 h) before the brew date. Unfilled for longer than that after its SIP, it needs another SIP.</li>
+          <li class="muted">Fermenters don’t get acid washes.</li>
         </ul>
       </section>
       <section class="ksec bbt">
         <h3>${vpill('bbt', '')} Brite tanks</h3>
         <ul>
-          <li>Clean (acid CIP/SIP or CIP) done fewer than ${rin('bbtDays', r.bbtDays)} days before the transfer = green</li>
-          <li>Over that: <span class="tag dme">DME</span> tanks <input class="rt" type="text" value="${esc(c.d.cfg.dme)}" data-act="ruletext" data-k="rule:dme" data-rule="dme" aria-label="DME tank numbers" title="BBT numbers, e.g. 3-6"> are fine (purple); all other (<span class="tag krones">Krones</span>) tanks are flagged</li>
-          <li>Count of acid CIP/SIPs since the last CIP: <b class="cw1">${rin('cntWarn1', r.cntWarn1, 0, 99)}</b> caution · <b class="cw2">${rin('cntWarn2', r.cntWarn2, 0, 99)}</b> warning · <b class="cw3">${rin('cntMax', r.cntMax, 1, 99)}</b> must be cleaned</li>
-          <li>Ready to fill = count below ${r.cntMax} <span class="muted">(Krones tanks also need the green clean window)</span></li>
-          <li class="muted">Count: each acid CIP/SIP between brews adds 1; a caustic CIP with its SIP resets it to 0.</li>
+          <li>Every CIP (caustic) is followed by a SIP, same as fermenters.</li>
+          <li>Only brites get acid washes: every fill is followed by an <b>acid CIP</b>, which adds 1 to the tank’s count.</li>
+          <li>A <b>CIP</b> is required after <b class="cw3">${rin('cntMax', r.cntMax, 1, 99)}</b> fills: a tank on ${r.cntMax} can’t be filled until it has had a CIP. A CIP at any time resets the count to 0.</li>
+          <li>Ready to fill = count below ${r.cntMax}</li>
+          <li>Acid CIP or CIP done fewer than ${rin('bbtDays', r.bbtDays)} days before the transfer = green</li>
+          <li>Over that: <span class="tag dme">DME</span> tanks <input class="rt" type="text" value="${esc(c.d.cfg.dme)}" data-act="ruletext" data-k="rule:dme" data-rule="dme" aria-label="DME tank numbers" title="BBT numbers, e.g. 3-6"> are fine (purple); all other (<span class="tag krones">Krones</span>) tanks are flagged and aren’t ready to fill</li>
         </ul>
       </section>
     </div>
@@ -137,7 +138,9 @@ function keyCard(c) {
         <li>FV rows come from brews on the Live Brewery Board (FV/FMT); BBT rows come from its Transfer lines. Brew and transfer dates are filled in for you; CIP, SIP and count are entered here.</li>
         <li>Two brews on the same FV within 2 days are one fill (the first day). Two transfers into the same BBT on one day are one fill.</li>
         <li>“Needs data” only appears for brews and transfers dated before today; anything dated today or later shows “Not due yet”, because nothing can be entered ahead of time.</li>
-        <li>BBT limits are measured from the first clean date on the row (the CIP date, or the acid CIP/SIP date).</li>
+        <li>A SIP dated before its CIP is shown as “Check dates” so the entry can be corrected.</li>
+        <li>Time a BBT sits unfilled (over 72 h since its SIP, or over a week since its CIP) isn’t tracked separately: only the clean-to-fill window above is checked for brites.</li>
+        <li>BBT limits are measured from the first clean date on the row (the CIP date, or the acid CIP date).</li>
         <li>Re-importing the board never overwrites dates you typed. Vessel lists are under the cog.</li>
       </ul>
     </details>
@@ -234,7 +237,8 @@ function bbtTile(n, c) {
   const known = c.bbtAll.filter((x) => x.r.bbt === n && x.s.count !== null && x.r.transfer && x.r.transfer <= c.today).sort(byDateDesc('transfer'))[0];
   const count = s?.count ?? known?.s.count ?? null;
   const countNote = s?.count !== null && s?.count !== undefined ? '' : known ? ` (last logged, ${fmtShort(known.r.transfer)})` : '';
-  const segs = Array.from({ length: 8 }, (_, i) => `<i class="${count !== null && i < count ? (i >= 7 ? 'bad' : i === 6 ? 'warn2' : i === 5 ? 'warn1' : 'on') : ''}"></i>`).join('');
+  const max = c.cfg.rules.cntMax;
+  const segs = Array.from({ length: max }, (_, i) => `<i class="${count !== null && i < count ? (count >= max ? 'bad' : 'on') : ''}"></i>`).join('');
   const sub = !f ? 'No record' : f.kind === 'wait' ? `Acid CIP ${fmtShort(r.acidCip)}` : `${f.kind === 'next' ? 'Next fill ' : 'Filled '}${fmtShort(r.transfer)}`;
   const tip = !f ? `BBT ${n} — no record` : `BBT ${n} — ${s.label}${r.batch ? ' · ' + r.batch : ''} · ${count === null ? 'count not entered' : count + ' acid CIPs/fills'}`;
   return `<button class="tile big ${st}" data-act="goto" data-view="bbt" data-q="${n}" title="${esc(tip)}">
@@ -286,7 +290,7 @@ export function bbtView() {
   ${tiles(BBT_FILTERS, counts, f, 'bbt', sum)}
   ${toolbar('bbt', rows.length, c.bbt.length)}
   <div class="card tablecard"><div class="tscroll"><table class="grid bbtt">
-    <thead><tr><th>BBT</th><th>Clean date<small>acid CIP/SIP · CIP</small></th><th class="c" title="Calculated: each acid CIP/SIP adds 1 and a caustic CIP resets it to 0 (pick Acid or CIP beside the date; a CIP also takes its SIP date). Type over it to set it by hand. ${c.cfg.rules.cntWarn1} = caution, ${c.cfg.rules.cntWarn2} = warning, ${c.cfg.rules.cntMax} = must be cleaned.">Acid CIPs<small>count</small></th><th>Transfer date</th><th>From FV · beer</th><th class="c" title="Transfer date − clean date. Under ${c.cfg.rules.bbtDays} days is green; purple is acceptable for DME BBTs.">CIP → fill<small>days</small></th><th title="Needs fewer than ${c.cfg.rules.cntMax} acid CIPs/fills since the last CIP. Krones BBTs must also be green in CIP → fill.">Ready to fill?</th><th class="act"></th></tr></thead>
+    <thead><tr><th>BBT</th><th>Clean date<small>acid CIP · CIP</small></th><th class="c" title="Calculated: each acid CIP (acid wash after a fill) adds 1 and a CIP (caustic) resets it to 0 — pick Acid CIP or CIP beside the date; a CIP also takes its SIP date. Type over it to set it by hand. A CIP is required at ${c.cfg.rules.cntMax}.">Acid CIPs<small>count</small></th><th>Transfer date</th><th>From FV · beer</th><th class="c" title="Transfer date − clean date. Under ${c.cfg.rules.bbtDays} days is green; purple is acceptable for DME BBTs.">CIP → fill<small>days</small></th><th title="Needs fewer than ${c.cfg.rules.cntMax} fills/acid CIPs since the last CIP. Krones BBTs must also be green in CIP → fill.">Ready to fill?</th><th class="act"></th></tr></thead>
     <tbody>${shown.map(({ r, s }) => `<tr class="row ${s.state}${s.planned ? ' planned' : ''}" data-id="${r.id}">
       <td data-l="Vessel"><div class="vcell">${vpill('bbt', r.bbt)}<span class="tag ${s.dme ? 'dme' : 'krones'}">${s.dme ? 'DME' : 'Krones'}</span></div></td>
       <td data-l="Clean date">${bbtDate(r)}</td>

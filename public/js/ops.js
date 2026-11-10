@@ -2,12 +2,12 @@
 // Record shapes:
 //   FV  : { id, fv, cip, sip, brew, recipe, note, bsrc }                       dates are 'YYYY-MM-DD' or ''
 //   BBT : { id, bbt, acidCip, acidSip, acidType, acidCount, transfer, fromFv, batch, note, tsrc }
-//   acidType: 'cip' (caustic CIP: count resets to 0), 'sip' (the acid CIP/SIP done between brews: count + 1) or '' (count typed by hand / migrated).
+//   acidType: 'cip' (CIP = caustic: count resets to 0), 'sip' (acid CIP / acid wash after a fill: count + 1) or '' (count typed by hand / migrated).
 //   bsrc/tsrc say where the brew/transfer date came from: 'board' (Live Brewery Board), 'sheet' (migrated spreadsheet) or ''.
 
 // The compliance limits ("the key" on the Overview). All editable; days are whole numbers.
-export const RULE_LIMITS = { fvCip: [1, 60], fvSip: [1, 60], fvAlt: [0, 60], bbtDays: [1, 60], cntWarn1: [0, 99], cntWarn2: [0, 99], cntMax: [1, 99] };
-export const DEFAULT_RULES = { fvCip: 8, fvSip: 3, fvAlt: 3, bbtDays: 3, cntWarn1: 6, cntWarn2: 7, cntMax: 8 };
+export const RULE_LIMITS = { fvCip: [1, 60], fvSip: [1, 60], fvAlt: [0, 60], bbtDays: [1, 60], cntMax: [1, 99] };
+export const DEFAULT_RULES = { fvCip: 8, fvSip: 3, fvAlt: 3, bbtDays: 3, cntMax: 6 };
 export const DEFAULT_CFG = { fvs: '1-12, 14-28, 31, 35-60', bbts: '1-8', dme: '3-6', ...DEFAULT_RULES };
 export const rulesOf = (cfg) => Object.fromEntries(Object.keys(DEFAULT_RULES).map((k) => [k, Number.isInteger(cfg?.[k]) ? cfg[k] : DEFAULT_RULES[k]]));
 export const emptyDb = () => ({ ver: '', fv: [], bbt: [], cfg: { ...DEFAULT_CFG }, meta: {} });
