@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign in — Balter Brewing CIP / SIP Compliance</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#47D7AC">
+<link rel="preload" href="/fonts/lexend-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body class="loginpage">
+<div class="bubbles" aria-hidden="true"></div>
+<main class="login">
+  <form id="form" class="card logincard" novalidate>
+    <div class="logo big" aria-hidden="true"><svg viewBox="0 0 161 161"><path fill="#47D7AC" d="M136.3,70.4l-9.4-9.4c-1.6-1.6-4.3-1.6-6,0-1.6,1.6-1.6,4.3,0,6l2.3,2.3c-9.6,13.2-25.2,21.7-42.7,21.7s-33.1-8.6-42.7-21.8l2.3-2.3c1.6-1.6,1.6-4.3,0-6-1.6-1.6-4.3-1.6-6,0l-9.4,9.4c-1.6,1.6-1.6,4.3,0,6,.8.8,1.9,1.2,3,1.2s2.2-.4,3-1.2l1.1-1.1c11.2,14.7,28.9,24.2,48.7,24.2s37.5-9.5,48.7-24.2l1.1,1.1c.8.8,1.9,1.2,3,1.2s2.2-.4,3-1.2c1.6-1.6,1.6-4.3,0-6"/><path fill="#47D7AC" d="M152.5,8.5v144H8.5V8.5h144M161,0H0v161h161V0h0Z"/></svg></div>
+    <span class="kicker">Balter Brewing</span>
+    <h1>CIP / SIP Compliance</h1>
+    <p class="muted" id="lead">Checking…</p>
+    <label id="codeRow" hidden>Setup code<input type="password" id="code" autocomplete="off"></label>
+    <label>PIN<input type="password" id="pw" inputmode="numeric" autocomplete="current-password" required autofocus></label>
+    <label id="pw2Row" hidden>Confirm PIN<input type="password" id="pw2" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label>
+    <p class="msg err" id="msg" role="alert"></p>
+    <button class="btn primary wide" id="go" type="submit" disabled>Continue</button>
+    <div class="stripe" aria-hidden="true"></div>
+  </form>
+</main>
+<script src="/login.js"></script>
+</body>
+</html>
