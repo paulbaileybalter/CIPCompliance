@@ -65,7 +65,7 @@ h1 { font-size: 20px; font-weight: 600; letter-spacing: -.01em; white-space: now
 .card-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
 .card-h.sub { margin-top: 26px; padding-top: 18px; border-top: 1px dashed var(--line-2); }
 .card-h h2 { font-size: 17px; font-weight: 600; }
-.grid2 { display: grid; grid-template-columns: minmax(300px, 5fr) minmax(340px, 7fr); gap: 20px; align-items: start; }
+.grid2 { display: grid; grid-template-columns: minmax(420px, 6fr) minmax(340px, 6fr); gap: 20px; align-items: start; }
 
 /* ---------- buttons & inputs ---------- */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1.5px solid var(--ink); background: #fff; color: #000; padding: 8px 15px; border-radius: 999px; font-weight: 500; font-size: 14px; line-height: 1.2; transition: transform .1s, background .15s, box-shadow .15s; white-space: nowrap; }
@@ -93,6 +93,11 @@ input:focus, select:focus { border-color: var(--purple); outline: none; box-shad
 .drop { display: flex; align-items: center; gap: 22px; padding: 20px 26px; border: 2.5px dashed var(--mint); border-radius: 22px; background: linear-gradient(135deg, var(--mint-t), #fff 55%, var(--cream-t)); cursor: pointer; transition: transform .15s, border-color .15s, box-shadow .15s; }
 .drop:hover { border-style: solid; box-shadow: var(--shadow); }
 .drop.big { padding: 44px 34px; }
+.drop.mini { margin-top: 16px; padding: 10px 14px; gap: 12px; border-width: 2px; border-radius: 14px; }
+.drop.mini .hop { width: 34px; height: 34px; }
+.drop.mini h2 { font-size: 15px; margin-bottom: 1px; }
+.drop.mini p { font-size: 12.5px; }
+.drop.mini .meta { margin-top: 2px; font-size: 11.5px; }
 .drop.big h2 { font-size: 24px; }
 .hop { width: 62px; height: 62px; flex: none; }
 .drop.big .hop { width: 88px; height: 88px; }
@@ -106,7 +111,9 @@ input:focus, select:focus { border-color: var(--purple); outline: none; box-shad
 #dropOverlay b { font-size: 22px; }
 
 /* ---------- meters (pint glasses) ---------- */
-.glasses { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.glasses { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.meter, .meter .m-t { min-width: 0; }
+.meter .m-c { display: flex; flex-wrap: wrap; gap: 4px; }
 .meter { display: flex; align-items: center; gap: 14px; text-align: left; border: 1px solid var(--line); border-radius: 14px; background: #fff; padding: 14px; transition: border-color .15s, box-shadow .15s; }
 .meter:hover { border-color: var(--ink); box-shadow: var(--shadow); }
 .glass { width: 64px; flex: none; }

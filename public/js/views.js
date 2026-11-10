@@ -75,7 +75,7 @@ export function overview() {
   const fvSum = summarise(c.fv.map((x) => x.r), (r) => fvStatus(r, c.today));
   const bbtSum = summarise(c.bbt.map((x) => x.r), (r) => bbtStatus(r, c.cfg.dme, c.today));
   return `
-  ${dropzone(c, empty)}
+  ${empty ? dropzone(c, empty) : ''}
   <section class="grid2">
     <div class="card meters">
       <div class="card-h"><h2>Compliance in ${c.year}</h2>${yearSelect()}</div>
@@ -83,6 +83,7 @@ export function overview() {
         ${meter('fv', 'Fermenters', fvSum, 'g1')}
         ${meter('bbt', 'Brite tanks', bbtSum, 'g2')}
       </div>
+      ${empty ? '' : dropzone(c, empty)}
     </div>
     <div class="card attn">
       <div class="card-h"><h2>Needs a CIP / SIP entry</h2></div>
@@ -106,14 +107,14 @@ function legend() {
 function dropzone(c, empty) {
   const li = c.d.meta?.lastImport;
   const last = li ? `<p class="meta">Last import: <b>${esc(li.file || 'file')}</b> · ${new Date(li.at).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}${li.text ? ' · ' + esc(li.text) : ''}</p>` : '';
-  return `<section class="drop ${empty ? 'big' : ''}" id="drop" role="button" tabindex="0" data-act="browse" aria-label="Drop the Live Brewery Board spreadsheet here, or press Enter to choose a file">
+  return `<section class="drop ${empty ? 'big' : 'mini'}" id="drop" role="button" tabindex="0" data-act="browse" aria-label="Drop the Live Brewery Board spreadsheet here, or press Enter to choose a file">
     <svg class="hop" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 6c-3 0-4 4-4 6 0 2 1 4 4 4s4-2 4-4c0-2-1-6-4-6z" fill="#47D7AC" stroke="#000" stroke-width="2"/><path d="M32 18c-9 0-15 8-15 18 0 11 7 20 15 24 8-4 15-13 15-24 0-10-6-18-15-18z" fill="#F1EB9C" stroke="#000" stroke-width="2" stroke-linejoin="round"/><path d="M22 30c4 2 8 2 10 0 2 2 6 2 10 0M21 40c4 2 8 3 11 1 3 2 7 1 11-1M25 50c3 1 5 2 7 0 2 2 4 1 7 0" fill="none" stroke="#000" stroke-width="1.8" stroke-linecap="round"/></svg>
     <div class="drop-t">
       <h2>${empty ? 'Mash in your first Live Brewery Board' : 'Drop the Live Brewery Board here'}</h2>
-      <p>Brews become FV rows and transfers become BBT rows — you only add the CIP and SIP dates. ${empty ? 'Got the old <b>Vessel &amp; Equipment CIP monitoring</b> workbook? Drop that too and your existing rows come across.' : 'Re-importing is safe: nothing you typed is overwritten.'}</p>
+      <p>${empty ? 'Brews become FV rows and transfers become BBT rows — you only add the CIP and SIP dates. Got the old <b>Vessel &amp; Equipment CIP monitoring</b> workbook? Drop that too and your existing rows come across.' : 'Safe to re-import — nothing you typed is overwritten.'}</p>
       ${last}
     </div>
-    <span class="btn primary">${I.up}<span>Choose file</span></span>
+    <span class="btn primary ${empty ? '' : 'small'}">${I.up}<span>Choose file</span></span>
   </section>`;
 }
 
