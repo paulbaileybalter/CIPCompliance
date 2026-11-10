@@ -1,7 +1,7 @@
 // State, saving and syncing. No DOM building here (see views.js / app.js).
 // Edits are applied locally straight away ("pending"), then sent to the Worker in batches.
 import { applyOps, emptyDb } from './ops.js';
-import { todayISO, uid, parseList, yearOf, fvYear, bbtYear } from './rules.js';
+import { todayISO, uid, parseList, yearOf, fvYear, bbtYear, recomputeCounts } from './rules.js';
 export { uid, todayISO };
 
 export const hooks = { render: () => {}, toast: () => {} };
@@ -67,7 +67,12 @@ export function dispatch(ops) {
   touch(); persist(); hooks.render(); scheduleFlush();
 }
 export const putFv = (rec) => dispatch({ op: 'put', t: 'fv', rec });
-export const putBbt = (rec) => dispatch({ op: 'put', t: 'bbt', rec });
+export function putBbt(rec) {
+  // saving a row also refreshes the calculated counts of that tank's later rows
+  const changed = recomputeCounts([...db().bbt.filter((r) => r.id !== rec.id), rec], rec.bbt);
+  const mine = changed.find((r) => r.id === rec.id) || rec;
+  dispatch([{ op: 'put', t: 'bbt', rec: mine }, ...changed.filter((r) => r.id !== rec.id).map((r) => ({ op: 'put', t: 'bbt', rec: r }))]);
+}
 export const findFv = (id) => db().fv.find((r) => r.id === id);
 export const findBbt = (id) => db().bbt.find((r) => r.id === id);
 

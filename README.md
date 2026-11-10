@@ -48,3 +48,9 @@ It contains your operational data, so keep the GitHub repo **private**.
 If the site already had data in it when you deployed (so the seed didn't auto-load), use **Settings → Load CIP history** to merge it in.
 
 **Forgot the PIN / already set a longer password?** In Cloudflare → Workers & Pages → KV, delete the `auth` key; the next visit shows the PIN setup screen again (your data is untouched).
+
+## BBT fill count (automatic)
+
+Next to each BBT clean date pick **Acid** (the acid CIP/SIP done between brews: count = previous count + 1) or **CIP**
+(caustic CIP, which also takes its SIP date: count resets to 0). The count is filled in for you and follows later edits. Typing a count by hand switches
+that row back to manual. Older migrated rows keep their counts and are the starting point.

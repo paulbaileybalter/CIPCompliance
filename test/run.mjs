@@ -1,7 +1,7 @@
 // Run with:  npm test   (Node 20+). Real-file tests run only if the two spreadsheets are present in ./test/data or /mnt/user-data/uploads.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-import { fvStatus, bbtStatus, parseList, summarise, addDays, mondayOf, diffDays } from '../public/js/rules.js';
+import { fvStatus, bbtStatus, parseList, summarise, addDays, mondayOf, diffDays, recomputeCounts } from '../public/js/rules.js';
 import { applyOps, emptyDb } from '../public/js/ops.js';
 import { planBoardImport, planLegacyImport } from '../public/js/merge.js';
 import { parseWeek, parseBoard, parseLegacy, detectKind } from '../public/js/board.js';
@@ -25,6 +25,19 @@ test('FV compliance matches the sheet formula for every CIP/SIP/brew combination
     n++;
   }
   assert.ok(n > 80);
+});
+test('BBT count: acid CIP resets to 0, acid SIP adds 1, hand-typed rows are the starting point, later rows follow edits', () => {
+  const R = (id, transfer, acidType, acidCount, acidCip = transfer) => ({ id, bbt: 4, acidCip, acidType, acidCount, transfer });
+  const rows = [R('a', '2026-10-01', '', 3), R('b', '2026-10-05', 'sip', null), R('c', '2026-10-09', 'sip', null), R('d', '2026-10-13', 'cip', null), R('e', '2026-10-17', 'sip', null), { ...R('x', '2026-10-02', 'sip', null), bbt: 9 }];
+  const got = Object.fromEntries(recomputeCounts(rows, 4).map((r) => [r.id, r.acidCount]));
+  assert.deepEqual(got, { b: 4, c: 5, d: 0, e: 1 });
+  assert.equal(recomputeCounts(rows, 9).length, 0, 'first SIP with no earlier count cannot be calculated');
+  // a CIP in the middle is edited to an SIP: everything after follows
+  const applied = rows.map((r) => recomputeCounts(rows, 4).find((c) => c.id === r.id) || r);
+  const edited = applied.map((r) => (r.id === 'd' ? { ...r, acidType: 'sip' } : r));
+  assert.deepEqual(Object.fromEntries(recomputeCounts(edited, 4).map((r) => [r.id, r.acidCount])), { d: 6, e: 7 });
+  const clean = (t) => { const db = emptyDb(); applyOps(db, [{ op: 'put', t: 'bbt', rec: { id: 'q', bbt: 1, acidType: t } }]); return db.bbt[0].acidType; };
+  assert.equal(clean('cip'), 'cip'); assert.equal(clean('x'), '');
 });
 test('FV states: need / wait / check / planned', () => {
   assert.equal(fvStatus({ brew: '2026-11-11', cip: '', sip: '' }, T).state, 'need');

@@ -116,3 +116,23 @@ export function summarise(rows, statusFn) {
   s.pct = judged ? (s.bad ? Math.min(99, Math.round((s.good / judged) * 100)) : 100) : null;   // never show 100% while a row is non-compliant
   return s;
 }
+
+
+/* ---------- BBT fill count, calculated ----------
+   A caustic CIP resets the count to 0; the acid CIP/SIP done between brews adds 1 to the previous count.
+   Only rows with an acidType are calculated (older / hand-typed counts are left alone and used as the starting point). */
+const bbtKey = (r) => r.transfer || r.acidCip || '9999-12-31';
+export function recomputeCounts(records, bbt) {
+  const list = records.filter((r) => r.bbt === bbt).map((r, i) => [r, i]).sort((a, b) => (bbtKey(a[0]) < bbtKey(b[0]) ? -1 : bbtKey(a[0]) > bbtKey(b[0]) ? 1 : a[1] - b[1])).map((x) => x[0]);
+  const changed = [];
+  let prev = null;
+  for (const r of list) {
+    let count = r.acidCount ?? null;
+    if (r.acidType) {
+      const c = r.acidType === 'cip' ? 0 : prev === null ? null : prev + 1;
+      if (c !== null && c !== count) { count = c; changed.push({ ...r, acidCount: c }); }
+    }
+    prev = count;
+  }
+  return changed;
+}

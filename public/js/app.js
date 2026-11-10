@@ -40,13 +40,23 @@ function render() {
 hooks.render = render;
 
 /* ---------- field edits ---------- */
+// the acid CIP/SIP between brews is the routine entry; a caustic CIP (count back to 0) is the exception, so pick it deliberately
+const defaultAcidType = () => 'sip';
+function editField(t, rec, f, v) {
+  if (f === 'acidCount') v = v === '' || v === null ? null : Math.max(0, Math.min(99, Math.round(Number(v))));
+  const next = { ...rec, [f]: v };
+  if (t === 'bbt') {
+    if (f === 'acidType' && v !== 'cip') next.acidSip = '';
+    if (f === 'acidCount') next.acidType = '';                      // typed by hand: stop calculating this one
+    if (f === 'acidCip' && v && !rec.acidType && rec.acidCount === null) next.acidType = defaultAcidType(rec.bbt);
+  }
+  return next;
+}
 function setField(el) {
   const { t, id, f } = el.dataset;
   const rec = (t === 'fv' ? findFv : findBbt)(id);
   if (!rec) return;
-  let v = el.value;
-  if (f === 'acidCount') v = v === '' ? null : Math.max(0, Math.min(99, Math.round(Number(v))));
-  const next = { ...rec, [f]: v };
+  const next = editField(t, rec, f, el.value);
   if (f === 'brew') next.bsrc = '';          // typed by hand now, so a board re-import won't move it
   if (f === 'transfer') next.tsrc = '';
   (t === 'fv' ? putFv : putBbt)(next);
@@ -75,7 +85,7 @@ document.addEventListener('click', (e) => {
     case 'view': setUi({ view: d.view, q: '', limit: 300 }); window.scrollTo(0, 0); break;
     case 'goto': setUi({ view: d.view, q: d.q || '', fvFilter: 'all', bbtFilter: 'all', limit: 300 }); window.scrollTo(0, 0); break;
     case 'filter': { const k = d.t === 'fv' ? 'fvFilter' : 'bbtFilter'; setUi({ [k]: S.ui[k] === d.v ? 'all' : d.v, limit: 300 }); break; }
-    case 'today': { const rec = (d.t === 'fv' ? findFv : findBbt)(d.id); if (rec) (d.t === 'fv' ? putFv : putBbt)({ ...rec, [d.f]: todayISO() }); break; }
+    case 'today': { const rec = (d.t === 'fv' ? findFv : findBbt)(d.id); if (rec) (d.t === 'fv' ? putFv : putBbt)(editField(d.t, rec, d.f, todayISO())); break; }
     case 'del': removeRecord(d.t, d.id); break;
     case 'more': setUi({ limit: 1e9 }); break;
     case 'browse': $('#file').click(); break;
@@ -256,19 +266,22 @@ function openLog(kind) {
         <div class="dlg-f"><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="submit">${I.check}<span>Save</span></button></div></form>`
     : `<form id="logForm" class="form">
         <label>Vessel<select name="v" required autofocus><option value="">Choose…</option>${opts}</select></label>
-        <div class="row2"><label>Acid CIP date<input type="date" name="a" value="${today}"></label><label>Number of acid CIPs<input type="number" name="b" min="0" max="99" inputmode="numeric" placeholder="e.g. 3"></label></div>
+        <div class="row2"><label>Date<input type="date" name="a" value="${today}"></label><label>What was done<select name="c"><option value="sip">Acid CIP / SIP between brews — count + 1</option><option value="cip">Caustic CIP + SIP — count resets to 0</option></select></label></div>
+        <label id="sipRow" hidden>SIP date <span class="muted">(after the CIP)</span><input type="date" name="d" value="${today}"></label>
+        <label>Count <span class="muted">(leave empty to calculate it)</span><input type="number" name="b" min="0" max="99" inputmode="numeric" placeholder="auto"></label>
         <p class="muted">It joins the tank’s next transfer from the Live Brewery Board automatically.</p>
         <div class="dlg-f"><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="submit">${I.check}<span>Save</span></button></div></form>`;
   openModal({
-    title: kind === 'fv' ? 'Log FV CIP / SIP' : 'Log BBT acid CIP', body,
+    title: kind === 'fv' ? 'Log FV CIP / SIP' : 'Log BBT clean', body,
     onMount(m) {
       const form = $('#logForm', m);
       if (preset) form.v.value = preset;
+      if (kind === 'bbt') { const sr = $('#sipRow', m); form.c.addEventListener('change', () => { sr.hidden = form.c.value !== 'cip'; }); form.a.addEventListener('change', () => { if (!form.d.dataset.touched) form.d.value = form.a.value; }); form.d.addEventListener('input', () => { form.d.dataset.touched = '1'; }); }
       form.addEventListener('submit', (e) => {
         e.preventDefault();
         const v = Number(form.v.value);
         if (!v) return;
-        const msg = kind === 'fv' ? logFv(v, form.a.value, form.b.value) : logBbt(v, form.a.value, form.b.value === '' ? null : Number(form.b.value));
+        const msg = kind === 'fv' ? logFv(v, form.a.value, form.b.value) : logBbt(v, form.a.value, form.b.value === '' ? null : Number(form.b.value), form.c.value, form.d?.value || '');
         closeModal(); toast(msg);
       });
     },
@@ -292,16 +305,17 @@ function logFv(fv, cip, sip) {
   putFv({ id: uid(), fv, cip: cip || '', sip: sip || '', brew: '', recipe: '', note: '', bsrc: '' });
   return `Logged FV ${fv} — it will join its next brew`;
 }
-function logBbt(bbt, acidCip, count) {
-  if (!acidCip) return 'Nothing to save — enter the acid CIP date';
+function logBbt(bbt, acidCip, count, type, sip = '') {
+  if (!acidCip) return 'Nothing to save — enter the date';
+  type = count === null ? (type || defaultAcidType(bbt)) : '';        // a typed count wins; otherwise it is calculated
   const cands = db().bbt.filter((r) => r.bbt === bbt && !r.acidCip && (!r.transfer || r.transfer >= acidCip))
     .sort((a, b) => ((a.transfer || '9999') < (b.transfer || '9999') ? -1 : 1));
   const t = cands[0];
   if (t) {
-    putBbt({ ...t, acidCip, acidCount: count ?? t.acidCount });
+    putBbt({ ...t, acidCip, acidSip: type === 'cip' ? sip : '', acidType: type, acidCount: count ?? (type ? null : t.acidCount) });
     return t.transfer ? `Logged on BBT ${bbt} — transfer ${fmtDate(t.transfer)}` : `Logged on BBT ${bbt} — waiting for its next transfer`;
   }
-  putBbt({ id: uid(), bbt, acidCip, acidCount: count, transfer: '', fromFv: null, batch: '', note: '', tsrc: '' });
+  putBbt({ id: uid(), bbt, acidCip, acidSip: type === 'cip' ? sip : '', acidType: type, acidCount: count, transfer: '', fromFv: null, batch: '', note: '', tsrc: '' });
   return `Logged BBT ${bbt} — it will join its next transfer`;
 }
 

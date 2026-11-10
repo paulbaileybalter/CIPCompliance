@@ -28,6 +28,8 @@ const dateIn = (t, id, f, v, label) => `<input class="d" type="date" value="${es
 const todayBtn = (t, id, f, v) => (v ? '' : `<button type="button" class="today" data-act="today" data-t="${t}" data-id="${id}" data-f="${f}" tabindex="-1">Today</button>`);
 const dateCell = (t, id, f, v, label) => `<div class="dc">${dateIn(t, id, f, v, label)}${todayBtn(t, id, f, v)}</div>`;
 const countIn = (id, v, tone, label) => `<input class="n ${tone || ''}" type="number" min="0" max="99" inputmode="numeric" value="${v === null || v === undefined ? '' : v}" placeholder="–" data-act="set" data-t="bbt" data-id="${id}" data-f="acidCount" data-k="bbt:${id}:acidCount" aria-label="${esc(label)}">`;
+const typeSel = (id, v, bbt) => `<select class="ty" data-act="set" data-t="bbt" data-id="${id}" data-f="acidType" data-k="bbt:${id}:acidType" aria-label="BBT ${bbt}: acid CIP/SIP (adds 1) or caustic CIP (resets to 0)" title="Acid CIP/SIP between brews adds 1 to the count. A caustic CIP (with its SIP) resets it to 0.">${[['', '–'], ['sip', 'Acid'], ['cip', 'CIP']].map(([k, t]) => `<option value="${k}" ${k === (v || '') ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+const bbtDate = (r) => `<div class="dc">${dateIn('bbt', r.id, 'acidCip', r.acidCip, `BBT ${r.bbt} acid CIP or SIP date`)}${todayBtn('bbt', r.id, 'acidCip', r.acidCip)}${typeSel(r.id, r.acidType, r.bbt)}${r.acidType === 'cip' ? `<span class="sipin"><span class="muted">SIP</span>${dateIn('bbt', r.id, 'acidSip', r.acidSip, `BBT ${r.bbt} SIP date after the CIP`)}${todayBtn('bbt', r.id, 'acidSip', r.acidSip)}</span>` : ''}</div>`;
 const vpill = (kind, n) => `<span class="vpill ${kind}">${kind === 'fv' ? 'FV' : 'BBT'} ${n}</span>`;
 const plannedTag = (on) => (on ? '<span class="tag plan" title="Date is in the future (from the board plan)">planned</span>' : '');
 const boardMark = (src) => (src === 'board' ? `<span class="srcmark" title="Date from the Live Brewery Board">${I.board}</span>` : '');
@@ -158,7 +160,7 @@ function bbtAttn({ r, s }, c) {
   return `<div class="att" data-id="${r.id}">
     <div class="att-h">${vpill('bbt', r.bbt)}<span class="att-t">${esc(r.batch || 'transfer')}${r.fromFv ? ` <span class="muted">from FV ${r.fromFv}</span>` : ''}</span>${dueLabel(r.transfer, c.today)}</div>
     <div class="att-f">
-      <label><span>Acid CIP</span>${dateCell('bbt', r.id, 'acidCip', r.acidCip, `BBT ${r.bbt} acid CIP date`)}</label>
+      <label><span>Date</span>${bbtDate(r)}</label>
       <label><span>Count</span>${countIn(r.id, r.acidCount, '', `BBT ${r.bbt} number of acid CIPs`)}</label>
     </div></div>`;
 }
@@ -241,10 +243,10 @@ export function bbtView() {
   ${tiles(BBT_FILTERS, counts, f, 'bbt', sum)}
   ${toolbar('bbt', rows.length, c.bbt.length)}
   <div class="card tablecard"><div class="tscroll"><table class="grid bbtt">
-    <thead><tr><th>BBT</th><th>Acid CIP date</th><th class="c" title="Number of acid CIPs (beer fills for DME BBTs). 6 = caution, 7 = warning, 8 = must be cleaned.">Acid CIPs<small>count</small></th><th>Transfer date</th><th>From FV · beer</th><th class="c" title="Transfer date − acid CIP date. Under 3 days is green; purple is acceptable for DME BBTs.">CIP → fill<small>days</small></th><th title="Needs fewer than 8 acid CIPs. Krones BBTs must also be green in CIP → fill.">Ready to fill?</th><th class="act"></th></tr></thead>
+    <thead><tr><th>BBT</th><th>Clean date<small>acid CIP/SIP · CIP</small></th><th class="c" title="Calculated: each acid CIP/SIP adds 1 and a caustic CIP resets it to 0 (pick Acid or CIP beside the date; a CIP also takes its SIP date). Type over it to set it by hand. 6 = caution, 7 = warning, 8 = must be cleaned.">Acid CIPs<small>count</small></th><th>Transfer date</th><th>From FV · beer</th><th class="c" title="Transfer date − acid CIP date. Under 3 days is green; purple is acceptable for DME BBTs.">CIP → fill<small>days</small></th><th title="Needs fewer than 8 acid CIPs. Krones BBTs must also be green in CIP → fill.">Ready to fill?</th><th class="act"></th></tr></thead>
     <tbody>${shown.map(({ r, s }) => `<tr class="row ${s.state}${s.planned ? ' planned' : ''}" data-id="${r.id}">
       <td data-l="Vessel"><div class="vcell">${vpill('bbt', r.bbt)}<span class="tag ${s.dme ? 'dme' : 'krones'}">${s.dme ? 'DME' : 'Krones'}</span></div></td>
-      <td data-l="Acid CIP date">${dateCell('bbt', r.id, 'acidCip', r.acidCip, `BBT ${r.bbt} acid CIP date`)}</td>
+      <td data-l="Clean date">${bbtDate(r)}</td>
       <td data-l="Acid CIPs" class="c">${countIn(r.id, r.acidCount, s.countTone, `BBT ${r.bbt} number of acid CIPs`)}</td>
       <td data-l="Transfer date"><div class="dc">${dateIn('bbt', r.id, 'transfer', r.transfer, `BBT ${r.bbt} transfer date`)}${boardMark(r.tsrc)}${plannedTag(s.planned)}</div></td>
       <td data-l="From" class="beer">${r.fromFv ? `<span class="muted">FV ${r.fromFv}</span> ` : ''}${esc(r.batch)}</td>
@@ -271,7 +273,7 @@ function toolbar(kind, shown, total) {
     <label class="search"><span class="sr">Search</span><input type="search" id="q" data-act="search" data-k="search" placeholder="${kind === 'fv' ? 'Search FV number or beer…' : 'Search BBT number or beer…'}" value="${esc(S.ui.q)}" autocomplete="off"></label>
     <span class="muted count">${shown === total ? `${total} rows` : `${shown} of ${total} rows`}</span>
     <span class="grow"></span>
-    <button class="btn primary" data-act="log" data-t="${kind}">${I.plus}<span>Log ${kind === 'fv' ? 'CIP / SIP' : 'acid CIP'}</span></button>
+    <button class="btn primary" data-act="log" data-t="${kind}">${I.plus}<span>Log ${kind === 'fv' ? 'CIP / SIP' : 'acid CIP / CIP'}</span></button>
     <button class="btn" data-act="browse">${I.up}<span>Import board</span></button>
     <button class="btn" data-act="export" data-t="${kind}">${I.down}<span>CSV</span></button>
   </div>`;

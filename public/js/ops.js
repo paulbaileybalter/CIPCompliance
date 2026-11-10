@@ -1,7 +1,8 @@
 // Data model + the change operations. Shared by the browser (optimistic updates) and the Worker (authoritative save).
 // Record shapes:
 //   FV  : { id, fv, cip, sip, brew, recipe, note, bsrc }                       dates are 'YYYY-MM-DD' or ''
-//   BBT : { id, bbt, acidCip, acidCount, transfer, fromFv, batch, note, tsrc }
+//   BBT : { id, bbt, acidCip, acidSip, acidType, acidCount, transfer, fromFv, batch, note, tsrc }
+//   acidType: 'cip' (caustic CIP: count resets to 0), 'sip' (the acid CIP/SIP done between brews: count + 1) or '' (count typed by hand / migrated).
 //   bsrc/tsrc say where the brew/transfer date came from: 'board' (Live Brewery Board), 'sheet' (migrated spreadsheet) or ''.
 
 export const DEFAULT_CFG = { fvs: '1-12, 14-28, 31, 35-60', bbts: '1-8', dme: '3-6' };
@@ -23,7 +24,7 @@ export function cleanBbt(r) {
   if (!r || typeof r !== 'object') return null;
   const id = str(r.id, 40), bbt = int(r.bbt, 1, 999);
   if (!id || !bbt) return null;
-  return { id, bbt, acidCip: date(r.acidCip), acidCount: int(r.acidCount, 0, 99), transfer: date(r.transfer), fromFv: int(r.fromFv, 1, 999), batch: str(r.batch, 80), note: str(r.note, 200), tsrc: src(r.tsrc) };
+  return { id, bbt, acidCip: date(r.acidCip), acidSip: date(r.acidSip), acidType: r.acidType === 'cip' || r.acidType === 'sip' ? r.acidType : '', acidCount: int(r.acidCount, 0, 99), transfer: date(r.transfer), fromFv: int(r.fromFv, 1, 999), batch: str(r.batch, 80), note: str(r.note, 200), tsrc: src(r.tsrc) };
 }
 
 const CLEAN = { fv: cleanFv, bbt: cleanBbt };

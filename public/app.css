@@ -208,6 +208,9 @@ table.grid { width: 100%; border-collapse: separate; border-spacing: 0; font-siz
 .vpill { display: inline-flex; align-items: center; border: 1.5px solid #000; border-radius: 8px; padding: 2px 9px; font-weight: 600; font-size: 13px; white-space: nowrap; background: var(--cream); }
 .vpill.bbt { background: var(--sky); }
 .dc { display: flex; align-items: center; gap: 6px; }
+.sipin { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; }
+.sipin input.d { width: 140px; }
+select.ty { padding: 6px 6px; font-size: 13px; font-weight: 600; width: auto; }
 input.d { border-color: transparent; background: transparent; padding: 5px 6px; width: 140px; font-size: 14px; }
 tr.row:hover input.d, input.d:focus { border-color: var(--line-2); background: #fff; }
 input.d::-webkit-calendar-picker-indicator { opacity: .35; cursor: pointer; }
