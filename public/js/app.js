@@ -1,6 +1,6 @@
 // Wires the page together: rendering, events, import flow, modals.
 import { S, db, config, hooks, esc, ready, load, startPolling, setStatus, setUi, dispatch, putFv, putBbt, findFv, findBbt, removeRecord, api, uid, todayISO } from './store.js';
-import { overview, fvView, bbtView, I } from './views.js';
+import { overview, fvView, bbtView, upcomingView, I } from './views.js';
 import { fvStatus, bbtStatus, addDays, mondayOf, fmtDate, fmtDateY, parseList, fvYear, bbtYear } from './rules.js';
 import { detectKind, parseBoard, parseLegacy } from './board.js';
 import { planBoardImport, planLegacyImport } from './merge.js';
@@ -39,7 +39,7 @@ function render() {
   const key = a && app.contains(a) ? a.dataset.k : null;
   const caret = key && a.selectionStart !== undefined && a.type === 'search' ? [a.selectionStart, a.selectionEnd] : null;
   const y = window.scrollY;
-  app.innerHTML = S.ui.view === 'fv' ? fvView() : S.ui.view === 'bbt' ? bbtView() : overview();
+  app.innerHTML = S.ui.view === 'fv' ? fvView() : S.ui.view === 'bbt' ? bbtView() : S.ui.view === 'upcoming' ? upcomingView() : overview();
   window.scrollTo(0, y);
   boundDates(app);
   if (key) {
@@ -103,6 +103,7 @@ document.addEventListener('change', (e) => {
   if (el.dataset.act === 'set' && el.type === 'date') { if (dateEl && dateEl !== el) commitDate(); dateEl = el; clearTimeout(dateTimer); dateTimer = setTimeout(commitDate, 1800); }
   else if (el.dataset.act === 'set') setField(el);
   else if (el.dataset.act === 'rule' || el.dataset.act === 'ruletext') saveRule(el);
+  else if (el.dataset.act === 'horizon') setUi({ horizon: Number(el.value) });
   else if (el.dataset.act === 'year') setUi({ year: Number(el.value), limit: 300 });
 });
 

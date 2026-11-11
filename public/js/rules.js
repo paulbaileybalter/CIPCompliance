@@ -143,3 +143,67 @@ export function recomputeCounts(records, bbt) {
   }
   return changed;
 }
+
+/* ---------- Upcoming brews & transfers: what's going where, and when to clean ----------
+   FV  brew on D   → CIP + SIP must land inside the window [D − (limit − 1), D]  (CIP < fvCip days, SIP < fvSip days before the brew).
+   BBT transfer on T → Acid CIP (or CIP + SIP when the tank has reached its fill limit) inside [T − (bbtDays − 1), T].
+   Each event gets a `task`: what to do, the window it can be done in, and whether it's already done / due now / opens later. */
+export function buildUpcoming(d, cfg, today, horizon = 14) {
+  const rules = cfg.rules || DEFAULT_RULES, dmeList = cfg.dme || [];
+  const last = addDays(today, horizon);
+  const events = [];
+  const state = (task, start, end) => (task === 'done' ? 'done' : today >= start ? 'now' : 'later');
+
+  for (const r of d.fv) {
+    if (!r.brew || r.brew < today || r.brew > last) continue;
+    const st = fvStatus(r, today, rules);
+    const D = r.brew;
+    const cipOk = !!r.cip && r.cip <= D && diffDays(D, r.cip) < rules.fvCip;
+    const sipOk = !!r.sip && r.sip <= D && diffDays(D, r.sip) < rules.fvSip && (!r.cip || r.sip >= r.cip);
+    let task = 'CIP + SIP', start = addDays(D, -(Math.min(rules.fvCip, rules.fvSip) - 1));
+    if (st.state === 'ok' || st.state === 'ok72') task = 'done';
+    else if (cipOk && !sipOk) { task = 'SIP'; start = addDays(D, -(rules.fvSip - 1)); }
+    events.push({ kind: 'brew', date: D, id: r.id, vessel: r.fv, beer: r.recipe || '', task, start, end: D, when: state(task, start, D),
+      note: task === 'done' ? `CIP ${fmtDate(r.cip)}, SIP ${fmtDate(r.sip)}` : '', rec: r });
+  }
+
+  // expected fill count per planned BBT row, carried forward from the last known count
+  const need = new Map();
+  const byBbt = new Map();
+  for (const r of d.bbt) { if (!byBbt.has(r.bbt)) byBbt.set(r.bbt, []); byBbt.get(r.bbt).push(r); }
+  for (const [, list] of byBbt) {
+    const rows = list.map((r, i) => [r, i]).sort((a, b) => ((a[0].transfer || a[0].acidCip || '9') < (b[0].transfer || b[0].acidCip || '9') ? -1 : (a[0].transfer || a[0].acidCip || '9') > (b[0].transfer || b[0].acidCip || '9') ? 1 : a[1] - b[1])).map((x) => x[0]);
+    let carry = null;
+    for (const r of rows) {
+      const known = r.acidCount === null || r.acidCount === undefined || r.acidCount === '' ? null : Number(r.acidCount);
+      let after = known, needCip = false, expected = null;
+      if (r.acidType === 'cip') after = 0;
+      else if (known !== null) { if (known >= rules.cntMax) { needCip = true; after = 0; } }
+      else if (carry !== null) { expected = carry + 1; if (expected >= rules.cntMax) { needCip = true; after = 0; } else after = expected; }
+      need.set(r.id, { needCip, expected: known ?? expected, before: carry });
+      carry = after;
+    }
+  }
+  const beerFor = (r) => {
+    if (r.batch) return r.batch;
+    if (!r.fromFv) return '';
+    const m = d.fv.filter((f) => f.fv === r.fromFv && f.brew && f.brew <= (r.transfer || '9')).sort((a, b) => (a.brew < b.brew ? 1 : -1))[0];
+    return m ? m.recipe || '' : '';
+  };
+  for (const r of d.bbt) {
+    if (!r.transfer || r.transfer < today || r.transfer > last) continue;
+    const st = bbtStatus(r, dmeList, today, rules);
+    const T = r.transfer, n = need.get(r.id) || {};
+    let task = n.needCip || r.acidType === 'cip' ? 'CIP + SIP' : 'Acid CIP';
+    if (st.state === 'ok' || st.state === 'ok-dme') task = 'done';
+    const start = addDays(T, -(rules.bbtDays - 1));
+    const dme = dmeList.includes(r.bbt);
+    let note = '';
+    if (task === 'done') note = r.acidType === 'cip' ? `CIP + SIP ${fmtDate(r.acidSip || r.acidCip)}` : `Acid CIP ${fmtDate(r.acidCip)}`;
+    else if (n.needCip) note = `Fill limit reached (${rules.cntMax}) — caustic CIP resets the count`;
+    else if (n.expected !== null && n.expected !== undefined) note = `Count will be ${n.expected} of ${rules.cntMax}`;
+    events.push({ kind: 'transfer', date: T, id: r.id, vessel: r.bbt, from: r.fromFv, beer: beerFor(r), task, start, end: T, when: state(task, start, T), dme, note, rec: r });
+  }
+  events.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.kind === b.kind ? a.vessel - b.vessel : a.kind === 'transfer' ? -1 : 1));
+  return events;
+}

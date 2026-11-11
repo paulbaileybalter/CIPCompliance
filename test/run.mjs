@@ -1,7 +1,7 @@
 // Run with:  npm test   (Node 20+). Real-file tests run only if the two spreadsheets are present in ./test/data or /mnt/user-data/uploads.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-import { fvStatus, bbtStatus, parseList, summarise, addDays, mondayOf, diffDays, recomputeCounts } from '../public/js/rules.js';
+import { buildUpcoming, fvStatus, bbtStatus, parseList, summarise, addDays, mondayOf, diffDays, recomputeCounts } from '../public/js/rules.js';
 import { DEFAULT_RULES, rulesOf, applyOps, emptyDb } from '../public/js/ops.js';
 import { planBoardImport, planLegacyImport } from '../public/js/merge.js';
 import { parseWeek, parseBoard, parseLegacy, detectKind } from '../public/js/board.js';
@@ -389,6 +389,26 @@ test('bbt: CIP days count from the SIP date', () => {
   assert.equal(bbtStatus(r, [], '2026-11-01').n, 2);
   assert.equal(bbtStatus(r, [], '2026-11-01').state, 'ok');
   assert.equal(bbtStatus({ ...r, acidType: 'sip' }, [], '2026-11-01').n, 4);
+});
+
+test('upcoming: windows, done state and BBT CIP-due', () => {
+  const cfg = { rules: DEFAULT_RULES, dme: [] };
+  const d = { fv: [
+    { id: 'a', fv: 5, cip: '', sip: '', brew: '2026-11-18', recipe: 'Pale' },
+    { id: 'b', fv: 6, cip: '2026-11-14', sip: '2026-11-16', brew: '2026-11-18', recipe: 'IPA' },
+    { id: 'c', fv: 7, cip: '2026-11-12', sip: '', brew: '2026-11-18', recipe: 'Lager' },
+    { id: 'z', fv: 8, cip: '', sip: '', brew: '2026-12-30', recipe: 'Far' } ],
+    bbt: [ { id: 'x', bbt: 2, acidCip: '2026-11-01', acidCount: 5, acidType: 'sip', transfer: '2026-11-03', fromFv: 5, batch: '' },
+           { id: 'y', bbt: 2, acidCip: '', acidCount: null, acidType: '', transfer: '2026-11-19', fromFv: 5, batch: '' } ] };
+  const ev = buildUpcoming(d, cfg, '2026-11-12', 14);
+  assert.equal(ev.length, 4);                                   // far brew + past transfer excluded
+  const by = (id) => ev.find((e) => e.id === id);
+  assert.equal(by('a').task, 'CIP + SIP'); assert.equal(by('a').start, '2026-11-16'); assert.equal(by('a').when, 'later');
+  assert.equal(by('b').task, 'done');
+  assert.equal(by('c').task, 'SIP'); assert.equal(by('c').start, '2026-11-16');
+  assert.equal(by('y').task, 'CIP + SIP');                      // 5 fills since CIP → the next one needs a caustic CIP
+  assert.equal(by('y').beer, 'Pale');                           // beer comes from the FV it's transferring from
+  assert.equal(by('y').start, '2026-11-17');
 });
 
 test('worker: data API — save, read, version polling, backup, validation, CSRF', async () => {

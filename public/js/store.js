@@ -19,6 +19,7 @@ export const S = {
   ui: {
     view: ls.get('bct.view') || 'overview',
     year: Number(ls.get('bct.year')) || Number(todayISO().slice(0, 4)),
+    horizon: [7, 14, 21, 28].includes(Number(ls.get('bct.horizon'))) ? Number(ls.get('bct.horizon')) : 14,
     fvFilter: 'all', bbtFilter: 'all', q: '', limit: 300,
   },
   lastPut: 0,
@@ -137,6 +138,7 @@ export function startPolling() {
 export function setUi(patch) {
   Object.assign(S.ui, patch);
   if ('view' in patch) ls.set('bct.view', S.ui.view);
+  if ('horizon' in patch) ls.set('bct.horizon', String(S.ui.horizon));
   if ('year' in patch) ls.set('bct.year', String(S.ui.year));
   hooks.render();
 }

@@ -66,3 +66,6 @@ Changes apply to every status, tile and alert immediately and are saved with the
 The **Excel** button in the header (left of the Saved indicator) downloads a styled workbook for the year shown on the
 Overview: a Summary sheet (compliance %, counts, the rules in force, colour key), Fermenters and Brite tanks (real Excel
 dates, coloured status cells, filters, frozen headers), all in the site's colour palette.
+
+## Upcoming tab
+Shows planned brews (FV) and transfers (BBT) for the next 7–28 days with the CIP / SIP / acid CIP each vessel needs, the window to do it in (from the rules in the Overview key), and whether it's done, due now or opens later. A brite on its fill limit is flagged as needing a CIP + SIP.

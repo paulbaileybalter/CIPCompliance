@@ -332,3 +332,29 @@ code { font-size: 12px; background: #f3f3f3; padding: 1px 6px; border-radius: 6p
   .row2, .pgrid { grid-template-columns: 1fr; }
   .vt { font-size: 22px; }
 }
+
+/* ---- Upcoming tab ---- */
+.upstats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.upstats > div { border: 1.5px solid var(--line-2); border-radius: 14px; padding: 12px 16px; background: #fff; display: flex; flex-direction: column; }
+.upstats b { font-size: 28px; font-weight: 600; line-height: 1.1; letter-spacing: -.02em; }
+.upstats span { font-size: 13px; color: var(--ink-2); }
+.upstats .hot { background: var(--gold-t); border-color: var(--gold); }
+.upcard { margin-bottom: 18px; }
+.tag.task { background: var(--mint-t); border-color: var(--mint-d); font-weight: 600; }
+.todo { list-style: none; margin: 0; padding: 0; }
+.todo li { display: grid; grid-template-columns: 90px 110px 1fr auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.todo li:first-child { border-top: 0; }
+.todo li.now .td-w b { background: var(--gold); padding: 0 6px; border-radius: 6px; }
+.td-w small { display: block; color: var(--ink-2); font-size: 12px; margin-top: 2px; }
+.upt .dcol { white-space: nowrap; min-width: 100px; vertical-align: top; }
+.upt .dcol small { display: block; color: var(--ink-3); font-weight: 400; font-size: 11.5px; }
+.upt tr.dayfirst td { border-top: 2px solid var(--line-2); }
+.upt .arrow { color: var(--ink-3); margin: 0 2px; }
+.upt .nt { display: block; color: var(--ink-2); font-size: 11.5px; margin-top: 2px; max-width: 240px; white-space: normal; }
+.upfoot { margin-top: 4px; }
+@media (max-width: 760px) { .upstats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .todo li { grid-template-columns: 1fr auto; } .todo li .td-t { grid-column: 1; } }
+@media (max-width: 760px) {
+  .todo li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+  .todo li .td-w { flex: 1 1 100%; order: 3; }
+  .todo li .btn { margin-left: auto; order: 2; }
+}

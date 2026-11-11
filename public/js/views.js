@@ -1,6 +1,6 @@
 // HTML for the three views. Pure string building from state — events are wired in app.js.
 import { S, db, config, years, esc, todayISO } from './store.js';
-import { fvStatus, bbtStatus, isGood, summarise, fvYear, bbtYear, fmtDate, fmtDateY, relDay, diffDays, addDays } from './rules.js';
+import { buildUpcoming, fvStatus, bbtStatus, isGood, summarise, fvYear, bbtYear, fmtDate, fmtDateY, relDay, diffDays, addDays } from './rules.js';
 
 /* ---------- icons ---------- */
 const svg = (d, extra = '') => `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true" ${extra}>${d}</svg>`;
@@ -327,3 +327,39 @@ function toolbar(kind, shown, total) {
 }
 const emptyNote = (shown, total) => (shown ? '' : `<div class="emptyrows">${total ? 'No rows match this filter.' : 'No rows for this year yet. Drop the Live Brewery Board onto the page, or use “Log CIP / SIP”.'}</div>`);
 const moreBtn = (all, shown) => (all > shown ? `<div class="emptyrows"><button class="btn" data-act="more">Show all ${all} rows</button></div>` : '');
+
+/* ---------- UPCOMING: what's going where, and when to clean ---------- */
+const WHEN_CHIP = (e) => (e.when === 'done' ? `<span class="chip ok" title="${esc(e.note)}">${I.check}<span>Done</span></span>`
+  : e.when === 'now' ? `<span class="chip need">${I.alert}<span>Do now</span></span>`
+  : `<span class="chip wait">${I.clock}<span>From ${esc(fmtDate(e.start))}</span></span>`);
+const winText = (e) => (e.when === 'done' ? e.note : e.start === e.end ? fmtDate(e.end) : `${fmtDate(e.start)} → ${fmtDate(e.end)}`);
+const taskTag = (e) => (e.task === 'done' ? '<span class="muted">none needed</span>' : `<span class="tag task">${esc(e.task)}</span>`);
+const whatTxt = (e) => (e.kind === 'brew' ? `Brew into ${vpill('fv', e.vessel)}` : `${e.from ? `${vpill('fv', e.from)} <span class="arrow">→</span> ` : 'Transfer → '}${vpill('bbt', e.vessel)}${e.dme ? ' <span class="tag dme">DME</span>' : ''}`);
+
+export function upcomingView() {
+  const d = db(), cfg = config(), today = todayISO(), h = S.ui.horizon;
+  const ev = buildUpcoming(d, cfg, today, h);
+  const todo = ev.filter((e) => e.task !== 'done').sort((a, b) => (a.when === b.when ? (a.end < b.end ? -1 : a.end > b.end ? 1 : 0) : a.when === 'now' ? -1 : 1));
+  const brews = ev.filter((e) => e.kind === 'brew').length, trans = ev.length - brews;
+  const nowN = todo.filter((e) => e.when === 'now').length;
+  const hsel = `<label class="yearsel"><span>Look ahead</span><select data-act="horizon" data-k="horizon" aria-label="Days to look ahead">${[7, 14, 21, 28].map((n) => `<option value="${n}" ${n === h ? 'selected' : ''}>${n} days</option>`).join('')}</select></label>`;
+  const link = (e) => `<button class="btn small" data-act="goto" data-view="${e.kind === 'brew' ? 'fv' : 'bbt'}" data-q="${e.vessel}" title="Open ${e.kind === 'brew' ? 'FV' : 'BBT'} ${e.vessel} to enter the dates">Enter</button>`;
+  const days = [...new Set(ev.map((e) => e.date))];
+  return `<div class="vhead"><div><h2 class="vt"><span class="vt-ic">${tankSvg('fv')}</span>Upcoming</h2><p class="muted">What's brewing and moving over the next ${h} days, and when each vessel needs its CIP / SIP / acid CIP.</p></div>${hsel}</div>
+  <div class="upstats"><div><b>${brews}</b><span>Brews</span></div><div><b>${trans}</b><span>Transfers</span></div><div class="${nowN ? 'hot' : ''}"><b>${nowN}</b><span>Clean now</span></div><div><b>${todo.length}</b><span>Cleans outstanding</span></div></div>
+  ${ev.length ? '' : `<div class="card"><p class="muted">Nothing is planned in the next ${h} days. Drop the Live Brewery Board on the Overview to bring in the latest plan.</p></div>`}
+  ${todo.length ? `<div class="card upcard"><div class="card-h"><h2>Cleaning to do</h2><span class="muted">most urgent first</span></div>
+    <ul class="todo">${todo.map((e) => `<li class="${e.when}"><span class="td-v">${vpill(e.kind === 'brew' ? 'fv' : 'bbt', e.vessel)}</span><span class="td-t"><span class="tag task">${esc(e.task)}</span></span>
+      <span class="td-w"><b>${e.when === 'now' ? 'Do now' : `From ${esc(fmtDate(e.start))}`}</b>, finished by ${esc(fmtDate(e.end))}<small>${e.kind === 'brew' ? `before brewing ${esc(e.beer || 'a brew')}` : `before transferring ${e.from ? `from FV ${e.from} ` : ''}${esc(e.beer)}`}${e.note ? ` · ${esc(e.note)}` : ''}</small></span>${link(e)}</li>`).join('')}</ul></div>` : ''}
+  ${ev.length ? `<div class="card tablecard upcard"><div class="tscroll"><table class="grid upt">
+    <thead><tr><th>Date</th><th>What</th><th>Beer</th><th>Clean needed</th><th>Do it between</th><th>Status</th><th class="act"></th></tr></thead>
+    <tbody>${days.map((day) => ev.filter((e) => e.date === day).map((e, i) => `<tr class="row ${e.when === 'done' ? 'ok' : e.when === 'now' ? 'need' : 'wait'}${i === 0 ? ' dayfirst' : ''}">
+      <td data-l="Date" class="dcol">${i === 0 ? `<b>${esc(fmtDate(day))}</b><small>${esc(relDay(day, today))}</small>` : ''}</td>
+      <td data-l="What">${whatTxt(e)}</td>
+      <td data-l="Beer" class="beer">${esc(e.beer)}</td>
+      <td data-l="Clean needed">${taskTag(e)}${e.when !== 'done' && e.note ? `<small class="nt">${esc(e.note)}</small>` : ''}</td>
+      <td data-l="Do it between">${esc(winText(e))}</td>
+      <td data-l="Status">${WHEN_CHIP(e)}</td>
+      <td class="act">${e.when === 'done' ? '' : link(e)}</td></tr>`).join('')).join('')}</tbody></table></div></div>` : ''}
+  <p class="muted upfoot">Windows come from the rules in the Overview key: FVs need a CIP under ${cfg.rules.fvCip} days and a SIP under ${cfg.rules.fvSip} days before the brew; brites need an acid CIP under ${cfg.rules.bbtDays} days before the transfer (DME tanks are more flexible), and a CIP + SIP once they reach ${cfg.rules.cntMax} fills. Planned dates come from the Live Brewery Board.</p>`;
+}
