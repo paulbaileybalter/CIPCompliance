@@ -80,7 +80,8 @@ export function fvStatus(r, today, rules = DEFAULT_RULES) {
    Ready to fill: L < 8 (Krones BBTs also need N < 3: "must be green" for Krones). */
 export function bbtStatus(r, dmeList, today, rules = DEFAULT_RULES) {
   const dme = dmeList.includes(r.bbt);
-  const n = diffDays(r.transfer, r.acidCip);
+  // days are counted from the SIP when the clean was a CIP + SIP; otherwise from the Acid CIP
+  const n = diffDays(r.transfer, r.acidType === 'cip' && r.acidSip ? r.acidSip : r.acidCip);
   const count = r.acidCount === null || r.acidCount === undefined || r.acidCount === '' ? null : Number(r.acidCount);
   const planned = !!r.transfer && !!today && r.transfer > today;
   const countTone = count !== null && count >= rules.cntMax ? 'bad' : '';
@@ -91,7 +92,7 @@ export function bbtStatus(r, dmeList, today, rules = DEFAULT_RULES) {
   }
   const missing = [!r.acidCip && 'acid CIP', count === null && 'fill count'].filter(Boolean);
   if (!r.acidCip) return { ...base, state: notDue ? 'wait' : 'need', label: notDue ? 'Not due yet' : `Needs ${missing.join(' + ')}`, missing };
-  if (n < 0) return { ...base, state: 'check', label: 'Check dates', reasons: ['Acid CIP date is after the transfer date'], missing };
+  if (n < 0) return { ...base, state: 'check', label: 'Check dates', reasons: ['Clean date is after the transfer date'], missing };
   if (r.acidType === 'cip' && r.acidSip && r.acidSip < r.acidCip) return { ...base, state: 'check', label: 'Check dates', reasons: ['SIP is dated before its CIP — every CIP is followed by a SIP'], missing };
   base.nTone = n < rules.bbtDays ? 'ok' : dme ? 'dme' : 'bad';
   if (count === null) return { ...base, state: notDue ? 'wait' : 'need', label: notDue ? 'Not due yet' : 'Needs fill count', missing };

@@ -23,6 +23,13 @@ function toast(msg, actionLabel, fn) {
 hooks.toast = toast;
 
 /* ---------- render ---------- */
+// Typed dates: only this year ±1 are accepted. (Typing "2026" passes through 0002, 0020, 0202 on the way; those are ignored until the date is real.)
+const dateBounds = () => { const y = Number(todayISO().slice(0, 4)); return { min: `${y - 1}-01-01`, max: `${y + 1}-12-31` }; };
+const outOfRange = (el) => { const { min, max } = dateBounds(); return !!el.value && (el.value < min || el.value > max); };
+function boundDates(root) {
+  const { min, max } = dateBounds();
+  root.querySelectorAll('input[type="date"]:not([data-keepbounds])').forEach((i) => { i.min = min; i.max = max; });
+}
 function render() {
   const tabs = document.querySelectorAll('.tab');
   tabs.forEach((t) => { const on = t.dataset.view === S.ui.view; t.setAttribute('aria-selected', on); t.classList.toggle('on', on); });
@@ -34,6 +41,7 @@ function render() {
   const y = window.scrollY;
   app.innerHTML = S.ui.view === 'fv' ? fvView() : S.ui.view === 'bbt' ? bbtView() : overview();
   window.scrollTo(0, y);
+  boundDates(app);
   if (key) {
     const el = app.querySelector(`[data-k="${CSS.escape(key)}"]`);
     if (el) { el.focus({ preventScroll: true }); if (caret) try { el.setSelectionRange(...caret); } catch { /* not a text input */ } }
@@ -70,10 +78,30 @@ function saveRule(el) {
   else if (el.value.trim() !== '' && Number.isInteger(Number(el.value))) dispatch({ op: 'cfg', set: { [k]: Number(el.value) } });
   else hooks.render();                                                  // empty / invalid: snap back
 }
+// Typing a date fires 'change' on every keystroke that forms a valid date (day, then month, then each year digit),
+// and a save re-renders the row, which wipes the field mid-typing. So dates are committed once typing pauses.
+let dateTimer = 0, dateEl = null;
+function commitDate() {
+  clearTimeout(dateTimer); const el = dateEl; dateEl = null;
+  if (!el || !el.isConnected) return;
+  if (outOfRange(el)) return;
+  setField(el);
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && dateEl && e.target === dateEl) commitDate(); });
+document.addEventListener('focusout', (e) => {
+  const el = e.target;
+  if (el === dateEl) commitDate();
+  if (!(el instanceof HTMLInputElement) || el.type !== 'date' || el.hasAttribute('data-keepbounds') || !outOfRange(el)) return;
+  const { min, max } = dateBounds();
+  toast(`Dates must be between ${min.slice(0, 4)} and ${max.slice(0, 4)}`);
+  if (el.dataset.act === 'set') render(); else el.value = el.defaultValue;       // restore the saved date
+});
 document.addEventListener('change', (e) => {
   const el = e.target.closest('[data-act]');
   if (!el) return;
-  if (el.dataset.act === 'set') setField(el);
+  if (el.type === 'date' && !el.hasAttribute('data-keepbounds') && outOfRange(el)) return;   // still typing the year
+  if (el.dataset.act === 'set' && el.type === 'date') { if (dateEl && dateEl !== el) commitDate(); dateEl = el; clearTimeout(dateTimer); dateTimer = setTimeout(commitDate, 1800); }
+  else if (el.dataset.act === 'set') setField(el);
   else if (el.dataset.act === 'rule' || el.dataset.act === 'ruletext') saveRule(el);
   else if (el.dataset.act === 'year') setUi({ year: Number(el.value), limit: 300 });
 });
@@ -119,6 +147,7 @@ function openModal({ title, body, wide = false, onMount }) {
   root.innerHTML = `<div class="backdrop" data-close></div><div class="dlg ${wide ? 'wide' : ''}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
     <header><h3>${esc(title)}</h3><button class="icon-btn" data-close aria-label="Close">${I.x}</button></header><div class="dlg-b">${body}</div></div>`;
   root.classList.add('open');
+  boundDates(root);
   modalEl = root.querySelector('.dlg');
   root.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', closeModal));
   (modalEl.querySelector('[autofocus]') || modalEl.querySelector('input,select,button:not([data-close])'))?.focus();
@@ -179,7 +208,7 @@ function previewBoard(fileName, parsed) {
   if (from < first) from = first;
   const body = `
     <p class="muted"><b>${esc(fileName)}</b> · ${pl(parsed.weeks.length, 'weekly sheet')} (${fmtDateY(first)} – ${fmtDateY(last)})</p>
-    <div class="fromrow"><label>Import weeks from <input type="date" id="impFrom" value="${from}" min="${first}" max="${last}"></label>
+    <div class="fromrow"><label>Import weeks from <input type="date" data-keepbounds id="impFrom" value="${from}" min="${first}" max="${last}"></label>
       <button class="btn small" type="button" data-pre="year">This year</button><button class="btn small" type="button" data-pre="4w">Last 4 weeks</button><button class="btn small" type="button" data-pre="all">Everything</button></div>
     <div id="impPlan"></div>
     <div class="dlg-f"><button class="btn" data-close>Cancel</button><button class="btn primary" id="impGo">${I.check}<span>Import</span></button></div>`;

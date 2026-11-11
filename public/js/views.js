@@ -140,7 +140,7 @@ function keyCard(c) {
         <li>“Needs data” only appears for brews and transfers dated before today; anything dated today or later shows “Not due yet”, because nothing can be entered ahead of time.</li>
         <li>A SIP dated before its CIP is shown as “Check dates” so the entry can be corrected.</li>
         <li>Time a BBT sits unfilled (over 72 h since its SIP, or over a week since its CIP) isn’t tracked separately: only the clean-to-fill window above is checked for brites.</li>
-        <li>BBT limits are measured from the first clean date on the row (the CIP date, or the acid CIP date).</li>
+        <li>BBT clean-to-fill days are measured from the SIP date when the clean was a CIP + SIP, otherwise from the Acid CIP date.</li>
         <li>Re-importing the board never overwrites dates you typed. Vessel lists are under the cog.</li>
       </ul>
     </details>
@@ -290,7 +290,7 @@ export function bbtView() {
   ${tiles(BBT_FILTERS, counts, f, 'bbt', sum)}
   ${toolbar('bbt', rows.length, c.bbt.length)}
   <div class="card tablecard"><div class="tscroll"><table class="grid bbtt">
-    <thead><tr><th>BBT</th><th>Clean date<small>acid CIP · CIP</small></th><th class="c" title="Calculated: each acid CIP (acid wash after a fill) adds 1 and a CIP (caustic) resets it to 0 — pick Acid CIP or CIP beside the date; a CIP also takes its SIP date. Type over it to set it by hand. A CIP is required at ${c.cfg.rules.cntMax}.">Acid CIPs<small>count</small></th><th>Transfer date</th><th>From FV · beer</th><th class="c" title="Transfer date − clean date. Under ${c.cfg.rules.bbtDays} days is green; purple is acceptable for DME BBTs.">CIP → fill<small>days</small></th><th title="Needs fewer than ${c.cfg.rules.cntMax} fills/acid CIPs since the last CIP. Krones BBTs must also be green in CIP → fill.">Ready to fill?</th><th class="act"></th></tr></thead>
+    <thead><tr><th>BBT</th><th>Clean date<small>acid CIP · CIP</small></th><th class="c" title="Calculated: each acid CIP (acid wash after a fill) adds 1 and a CIP (caustic) resets it to 0 — pick Acid CIP or CIP beside the date; a CIP also takes its SIP date. Type over it to set it by hand. A CIP is required at ${c.cfg.rules.cntMax}.">Acid CIPs<small>count</small></th><th>Transfer date</th><th>From FV · beer</th><th class="c" title="Transfer date − clean date (the SIP date when the clean was a CIP + SIP). Under ${c.cfg.rules.bbtDays} days is green; purple is acceptable for DME BBTs.">CIP → fill<small>days</small></th><th title="Needs fewer than ${c.cfg.rules.cntMax} fills/acid CIPs since the last CIP. Krones BBTs must also be green in CIP → fill.">Ready to fill?</th><th class="act"></th></tr></thead>
     <tbody>${shown.map(({ r, s }) => `<tr class="row ${s.state}${s.planned ? ' planned' : ''}" data-id="${r.id}">
       <td data-l="Vessel"><div class="vcell">${vpill('bbt', r.bbt)}<span class="tag ${s.dme ? 'dme' : 'krones'}">${s.dme ? 'DME' : 'Krones'}</span></div></td>
       <td data-l="Clean date">${bbtDate(r)}</td>

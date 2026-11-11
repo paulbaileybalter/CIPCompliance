@@ -384,6 +384,13 @@ test('worker: SETUP_CODE guards first-time setup', async () => {
   let r = await call(env, '/api/auth/setup', { method: 'POST', body: { password: '4827', code: 'guess' } }); assert.equal(r.status, 403);
   r = await call(env, '/api/auth/setup', { method: 'POST', body: { password: '4827', code: 'brew-crew' } }); assert.equal(r.status, 200);
 });
+test('bbt: CIP days count from the SIP date', () => {
+  const r = { id: 'x', bbt: 1, acidCip: '2026-03-01', acidSip: '2026-03-03', acidType: 'cip', acidCount: 0, transfer: '2026-03-05' };
+  assert.equal(bbtStatus(r, [], '2026-11-01').n, 2);
+  assert.equal(bbtStatus(r, [], '2026-11-01').state, 'ok');
+  assert.equal(bbtStatus({ ...r, acidType: 'sip' }, [], '2026-11-01').n, 4);
+});
+
 test('worker: data API — save, read, version polling, backup, validation, CSRF', async () => {
   const env = fakeEnv();
   const ck = cookieFrom(await call(env, '/api/auth/setup', { method: 'POST', body: { password: '4827' } }));
