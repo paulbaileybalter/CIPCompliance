@@ -177,17 +177,19 @@ function meter(kind, title, s, id) {
 
 function attention(c) {
   const limit = addDays(c.today, -14);
-  const fv = c.fvAll.filter((x) => x.s.state === 'need' && x.r.brew >= limit);
-  const bbt = c.bbtAll.filter((x) => x.s.state === 'need' && x.r.transfer >= limit);
+  // overdue rows still missing data, plus every brew and transfer happening today (so they can be entered as the day goes)
+  const fv = c.fvAll.filter((x) => (x.s.state === 'need' && x.r.brew >= limit) || x.r.brew === c.today);
+  const bbt = c.bbtAll.filter((x) => (x.s.state === 'need' && x.r.transfer >= limit) || x.r.transfer === c.today);
   const items = [
     ...fv.map((x) => ({ date: x.r.brew, html: fvAttn(x, c) })),
     ...bbt.map((x) => ({ date: x.r.transfer, html: bbtAttn(x, c) })),
   ].sort((a, b) => (a.date < b.date ? -1 : 1));
-  if (!items.length) return `<div class="allgood">${I.check}<div><b>All caught up.</b><span class="muted">Every brew and transfer so far has its CIP/SIP data.</span></div></div>`;
+  if (!items.length) return `<div class="allgood">${I.check}<div><b>All caught up.</b><span class="muted">Every brew and transfer so far has its CIP/SIP data, and nothing is going in today.</span></div></div>`;
   const older = c.fvAll.filter((x) => x.s.state === 'need' && x.r.brew < limit).length + c.bbtAll.filter((x) => x.s.state === 'need' && x.r.transfer < limit).length;
-  const shown = items.slice(0, 14);
+  const past = items.filter((i) => i.date < c.today).slice(-14);        // newest 14 overdue; today's rows are always shown
+  const shown = [...past, ...items.filter((i) => i.date >= c.today)];
   return `<div class="att-list">${shown.map((i) => i.html).join('')}</div>
-    ${items.length > shown.length ? `<p class="muted more">+ ${items.length - shown.length} more — open the Fermenters / Brite tabs and use “Needs data”.</p>` : ''}
+    ${items.length > shown.length ? `<p class="muted more">+ ${items.length - shown.length} older — open the Fermenters / Brite tabs and use “Needs data”.</p>` : ''}
     ${older ? `<p class="muted more">${older} older rows (before ${fmtDate(limit)}) are still missing data — see the tables.</p>` : ''}`;
 }
 const dueLabel = (date, today) => {
