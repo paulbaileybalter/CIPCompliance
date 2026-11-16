@@ -359,3 +359,6 @@ code { font-size: 12px; background: #f3f3f3; padding: 1px 6px; border-radius: 6p
   .todo li .td-w { flex: 1 1 100%; order: 3; }
   .todo li .btn { margin-left: auto; order: 2; }
 }
+
+/* colour strip sits at the very top of the page, same as the other Balter sites */
+.stripe.top { height: 5px; background: linear-gradient(90deg, var(--mint) 0 25%, var(--orange) 0 50%, var(--purple) 0 75%, var(--sky) 0); }
