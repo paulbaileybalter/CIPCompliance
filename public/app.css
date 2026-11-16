@@ -65,7 +65,8 @@ h1 { font-size: 20px; font-weight: 600; letter-spacing: -.01em; white-space: now
 .card-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
 .card-h.sub { margin-top: 26px; padding-top: 18px; border-top: 1px dashed var(--line-2); }
 .card-h h2 { font-size: 17px; font-weight: 600; }
-.grid2 { display: grid; grid-template-columns: minmax(420px, 6fr) minmax(340px, 6fr); gap: 20px; align-items: start; }
+.grid2 { display: grid; grid-template-columns: minmax(420px, 6fr) minmax(340px, 6fr); grid-template-areas: "m a" "k a"; gap: 20px; align-items: start; }
+.grid2 > .meters { grid-area: m; } .grid2 > .attn { grid-area: a; } .grid2 > .key { grid-area: k; }
 
 /* ---------- buttons & inputs ---------- */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1.5px solid var(--ink); background: #fff; color: #000; padding: 8px 15px; border-radius: 999px; font-weight: 500; font-size: 14px; line-height: 1.2; transition: transform .1s, background .15s, box-shadow .15s; white-space: nowrap; }
@@ -304,7 +305,7 @@ code { font-size: 12px; background: #f3f3f3; padding: 1px 6px; border-radius: 6p
 .logincard .btn { margin-top: 6px; }
 
 /* ---------- responsive ---------- */
-@media (max-width: 1100px) { .now { display: none; } .grid2 { grid-template-columns: 1fr; } .grid2 > .right { order: -1; } }
+@media (max-width: 1100px) { .now { display: none; } .grid2 { grid-template-columns: 1fr; grid-template-areas: "m" "a" "k"; } }
 @media (max-width: 900px) {
   .header-in { flex-wrap: wrap; padding: 10px 14px; gap: 10px; }
   .hright { width: 100%; justify-content: space-between; margin-left: 0; flex-wrap: wrap; gap: 10px; }
