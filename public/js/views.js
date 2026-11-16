@@ -87,9 +87,9 @@ export function overview() {
       </div>
       ${empty ? '' : dropzone(c, empty)}
     </div>
-    <div class="card attn">
-      <div class="card-h"><h2>Needs a CIP / SIP entry</h2></div>
-      ${attention(c)}
+    <div class="stack attn">
+      <div class="card"><div class="card-h"><h2>FVs needing a CIP / SIP entry</h2></div>${attention(c, 'fv')}</div>
+      <div class="card"><div class="card-h"><h2>BBTs needing a CIP / SIP entry</h2></div>${attention(c, 'bbt')}</div>
     </div>
     ${keyCard(c)}
   </section>
@@ -173,22 +173,20 @@ function meter(kind, title, s, id) {
   </button>`;
 }
 
-function attention(c) {
+function attention(c, kind) {
   const limit = addDays(c.today, -14);
   // overdue rows still missing data, plus every brew and transfer happening today (so they can be entered as the day goes)
-  const fv = c.fvAll.filter((x) => (x.s.state === 'need' && x.r.brew >= limit) || x.r.brew === c.today);
-  const bbt = c.bbtAll.filter((x) => (x.s.state === 'need' && x.r.transfer >= limit) || x.r.transfer === c.today);
-  const items = [
-    ...fv.map((x) => ({ date: x.r.brew, html: fvAttn(x, c) })),
-    ...bbt.map((x) => ({ date: x.r.transfer, html: bbtAttn(x, c) })),
-  ].sort((a, b) => (a.date < b.date ? -1 : 1));
-  if (!items.length) return `<div class="allgood">${I.check}<div><b>All caught up.</b><span class="muted">Every brew and transfer so far has its CIP/SIP data, and nothing is going in today.</span></div></div>`;
-  const older = c.fvAll.filter((x) => x.s.state === 'need' && x.r.brew < limit).length + c.bbtAll.filter((x) => x.s.state === 'need' && x.r.transfer < limit).length;
+  const isFv = kind === 'fv', all = isFv ? c.fvAll : c.bbtAll, key = isFv ? 'brew' : 'transfer';
+  const rows = all.filter((x) => (x.s.state === 'need' && x.r[key] >= limit) || x.r[key] === c.today);
+  const items = rows.map((x) => ({ date: x.r[key], html: isFv ? fvAttn(x, c) : bbtAttn(x, c) })).sort((p, q) => (p.date < q.date ? -1 : 1));
+  const word = isFv ? 'brew' : 'transfer';
+  if (!items.length) return `<div class="allgood">${I.check}<div><b>All caught up.</b><span class="muted">Every ${word} so far has its CIP/SIP data, and no ${isFv ? 'FV is being brewed into' : 'BBT is being transferred into'} today.</span></div></div>`;
+  const older = all.filter((x) => x.s.state === 'need' && x.r[key] < limit).length;
   const past = items.filter((i) => i.date < c.today).slice(-14);        // newest 14 overdue; today's rows are always shown
   const shown = [...past, ...items.filter((i) => i.date >= c.today)];
   return `<div class="att-list">${shown.map((i) => i.html).join('')}</div>
-    ${items.length > shown.length ? `<p class="muted more">+ ${items.length - shown.length} older — open the Fermenters / Brite tabs and use “Needs data”.</p>` : ''}
-    ${older ? `<p class="muted more">${older} older rows (before ${fmtDate(limit)}) are still missing data — see the tables.</p>` : ''}`;
+    ${items.length > shown.length ? `<p class="muted more">+ ${items.length - shown.length} older — open the ${isFv ? 'Fermenters' : 'Brite'} tab and use “Needs data”.</p>` : ''}
+    ${older ? `<p class="muted more">${older} older rows (before ${fmtDate(limit)}) are still missing data — see the table.</p>` : ''}`;
 }
 const dueLabel = (date, today) => {
   const d = diffDays(date, today);
