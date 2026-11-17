@@ -1,7 +1,7 @@
 // Run with:  npm test   (Node 20+). Real-file tests run only if the two spreadsheets are present in ./test/data or /mnt/user-data/uploads.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-import { buildUpcoming, fvStatus, bbtStatus, parseList, summarise, addDays, mondayOf, diffDays, recomputeCounts } from '../public/js/rules.js';
+import { findAnomalies, buildUpcoming, fvStatus, bbtStatus, parseList, summarise, addDays, mondayOf, diffDays, recomputeCounts } from '../public/js/rules.js';
 import { DEFAULT_RULES, rulesOf, applyOps, emptyDb } from '../public/js/ops.js';
 import { planBoardImport, planLegacyImport } from '../public/js/merge.js';
 import { parseWeek, parseBoard, parseLegacy, detectKind } from '../public/js/board.js';
@@ -409,6 +409,23 @@ test('upcoming: windows, done state and BBT CIP-due', () => {
   assert.equal(by('y').task, 'CIP + SIP');                      // 5 fills since CIP → the next one needs a caustic CIP
   assert.equal(by('y').beer, 'Pale');                           // beer comes from the FV it's transferring from
   assert.equal(by('y').start, '2026-11-17');
+});
+
+test('anomalies: odd rows are flagged even when compliant', () => {
+  const cfg = { rules: DEFAULT_RULES, dme: [3] };
+  const d = { fv: [
+    { id: 'a', fv: 5, cip: '2026-03-01', sip: '2026-03-02', brew: '2026-03-04', recipe: 'X' },
+    { id: 'b', fv: 5, cip: '2026-03-01', sip: '2026-03-02', brew: '2026-03-04', recipe: 'X' },
+    { id: 'c', fv: 6, cip: '2026-03-10', sip: '2026-03-08', brew: '2026-03-11', recipe: 'Y' },
+    { id: 'd', fv: 7, cip: '2026-03-01', sip: '2026-03-02', brew: '2026-03-20', recipe: 'Z' } ],
+    bbt: [ { id: 'x', bbt: 3, acidCip: '2026-03-01', acidSip: '', acidType: 'sip', acidCount: 2, transfer: '2026-03-02', fromFv: 5, batch: '' },
+           { id: 'y', bbt: 3, acidCip: '2026-03-03', acidSip: '', acidType: 'sip', acidCount: 5, transfer: '2026-03-12', fromFv: 5, batch: '' } ] };
+  const a = findAnomalies(d, cfg, '2026-11-17');
+  const has = (id, code) => a.some((x) => x.id === id && x.code === code);
+  assert.ok(has('a', 'dup')); assert.ok(has('c', 'order'));
+  assert.ok(has('y', 'count'));                 // 2 → 5 isn't +1
+  assert.ok(has('y', 'sat'));                   // DME tank sat 9 days after its clean
+  assert.ok(!a.some((x) => x.id === 'x'));       // a clean row has nothing odd
 });
 
 test('worker: data API — save, read, version polling, backup, validation, CSRF', async () => {

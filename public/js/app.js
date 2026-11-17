@@ -1,6 +1,6 @@
 // Wires the page together: rendering, events, import flow, modals.
 import { S, db, config, hooks, esc, ready, load, startPolling, setStatus, setUi, dispatch, putFv, putBbt, findFv, findBbt, removeRecord, api, uid, todayISO } from './store.js';
-import { overview, fvView, bbtView, upcomingView, I } from './views.js';
+import { overview, fvView, bbtView, upcomingView, anomalyList, anomalyBody, I } from './views.js';
 import { fvStatus, bbtStatus, addDays, mondayOf, fmtDate, fmtDateY, parseList, fvYear, bbtYear } from './rules.js';
 import { detectKind, parseBoard, parseLegacy } from './board.js';
 import { planBoardImport, planLegacyImport } from './merge.js';
@@ -42,6 +42,7 @@ function render() {
   app.innerHTML = S.ui.view === 'fv' ? fvView() : S.ui.view === 'bbt' ? bbtView() : S.ui.view === 'upcoming' ? upcomingView() : overview();
   window.scrollTo(0, y);
   boundDates(app);
+  const ab = $('#anomN'); if (ab) { const n = anomalyList().length; ab.textContent = n; ab.hidden = !n; }
   if (key) {
     const el = app.querySelector(`[data-k="${CSS.escape(key)}"]`);
     if (el) { el.focus({ preventScroll: true }); if (caret) try { el.setSelectionRange(...caret); } catch { /* not a text input */ } }
@@ -131,6 +132,7 @@ document.addEventListener('click', (e) => {
     case 'log': openLog(d.t); break;
     case 'export': exportCsv(d.t); break;
     case 'xlsx': exportXlsx(); break;
+    case 'anom': openModal({ title: 'Anomalies', body: anomalyBody(), wide: true }); break;
     case 'settings': openSettings(); break;
     default: break;
   }

@@ -364,3 +364,18 @@ code { font-size: 12px; background: #f3f3f3; padding: 1px 6px; border-radius: 6p
 .stripe.top { height: 5px; background: linear-gradient(90deg, var(--mint) 0 25%, var(--orange) 0 50%, var(--purple) 0 75%, var(--sky) 0); }
 
 .grid2 > .attn > .card { flex: 1 1 auto; }
+
+/* ---- Anomalies ---- */
+.btn.an { border-color: var(--purple); color: var(--purple); background: #fff; display: inline-flex; align-items: center; gap: 6px; }
+.btn.an:hover { background: #f1eef8; }
+.btn.an b { background: var(--purple); color: #fff; border-radius: 999px; min-width: 20px; height: 20px; padding: 0 6px; font-size: 11.5px; line-height: 20px; text-align: center; font-weight: 600; }
+.chip.flag { background: #f1eef8; border-color: var(--purple); color: #4b4070; margin-left: 6px; }
+tr.row.anom > td:first-child { box-shadow: inset 4px 0 0 var(--purple); }
+tr.row.anom { background: linear-gradient(90deg, rgba(117,102,160,.10), transparent 40%); }
+.anh { margin: 18px 0 6px; font-size: 14px; }
+.anl { list-style: none; margin: 0; padding: 0; }
+.anl li { display: grid; grid-template-columns: 84px 110px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.anl .an-d { color: var(--ink-2); font-size: 13px; white-space: nowrap; }
+@media (max-width: 640px) { .anl li { grid-template-columns: auto 1fr auto; } .anl .an-t { grid-column: 1 / -1; order: 4; } }
+.tab { white-space: nowrap; }
+@media (max-width: 1400px) { .now { display: none; } }

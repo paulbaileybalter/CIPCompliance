@@ -1,10 +1,11 @@
 // HTML for the three views. Pure string building from state — events are wired in app.js.
 import { S, db, config, years, esc, todayISO } from './store.js';
-import { buildUpcoming, fvStatus, bbtStatus, isGood, summarise, fvYear, bbtYear, fmtDate, fmtDateY, relDay, diffDays, addDays } from './rules.js';
+import { findAnomalies, buildUpcoming, fvStatus, bbtStatus, isGood, summarise, fvYear, bbtYear, fmtDate, fmtDateY, relDay, diffDays, addDays } from './rules.js';
 
 /* ---------- icons ---------- */
 const svg = (d, extra = '') => `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true" ${extra}>${d}</svg>`;
 export const I = {
+  flag: svg('<path d="M4 14V2.5M4 3h7.5l-1.6 2.6L11.5 8H4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>'),
   check: svg('<path d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'),
   x: svg('<path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'),
   alert: svg('<path d="M8 3v6M8 12.2v.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'),
@@ -52,6 +53,10 @@ function glass(pct, id) {
 }
 
 /* ---------- data selection ---------- */
+// anomalies: odd-looking rows, flagged even when they are technically compliant
+export const anomalyList = () => findAnomalies(db(), config(), todayISO());
+export const anomalyMap = () => { const m = new Map(); for (const a of anomalyList()) { if (!m.has(a.id)) m.set(a.id, []); m.get(a.id).push(a.text); } return m; };
+const flagChip = (m, id) => (m.has(id) ? `<span class="chip flag" title="${esc(m.get(id).join(' · '))}">${I.flag}<span>${m.get(id).length > 1 ? m.get(id).length : 'Odd'}</span></span>` : '');
 function ctx() {
   const d = db(), cfg = config(), today = todayISO(), year = S.ui.year;
   const fvAll = d.fv.map((r) => ({ r, s: fvStatus(r, today, cfg.rules) }));
@@ -249,7 +254,7 @@ const FV_FILTERS = [['all', 'Fills'], ['good', 'Compliant'], ['bad', 'Not compli
 const passFilter = (f, s) => f === 'all' || (f === 'good' ? isGood(s) : s.state === f);
 
 export function fvView() {
-  const c = ctx();
+  const c = ctx(), an = anomalyMap();
   const sum = summarise(c.fv.map((x) => x.r), (r) => fvStatus(r, c.today, c.cfg.rules));
   const counts = { all: sum.total, good: sum.good, bad: sum.bad, need: sum.need, wait: sum.wait };
   const f = S.ui.fvFilter;
@@ -260,7 +265,7 @@ export function fvView() {
   ${toolbar('fv', rows.length, c.fv.length)}
   <div class="card tablecard"><div class="tscroll"><table class="grid fvt">
     <thead><tr><th>FV</th><th>CIP date</th><th>SIP date</th><th>Brew date</th><th>Beer</th><th class="c" title="Brew date − CIP date. Under ${c.cfg.rules.fvCip} days.">CIP → fill<small>days</small></th><th class="c" title="Brew date − SIP date. Under ${c.cfg.rules.fvSip} days.">SIP → fill<small>days</small></th><th>Compliant</th><th class="act"></th></tr></thead>
-    <tbody>${shown.map(({ r, s }) => `<tr class="row ${s.state}${s.planned ? ' planned' : ''}" data-id="${r.id}">
+    <tbody>${shown.map(({ r, s }) => `<tr class="row ${s.state}${s.planned ? ' planned' : ''}${an.has(r.id) ? ' anom' : ''}" data-id="${r.id}">
       <td data-l="Vessel">${vpill('fv', r.fv)}</td>
       <td data-l="CIP date">${dateCell('fv', r.id, 'cip', r.cip, `FV ${r.fv} CIP date`)}</td>
       <td data-l="SIP date">${dateCell('fv', r.id, 'sip', r.sip, `FV ${r.fv} SIP date`)}</td>
@@ -268,7 +273,7 @@ export function fvView() {
       <td data-l="Beer" class="beer">${esc(r.recipe)}</td>
       <td data-l="CIP → fill" class="c">${daysChip(s.f, s.fTone, 'Brew date − CIP date')}</td>
       <td data-l="SIP → fill" class="c">${daysChip(s.g, s.gTone, 'Brew date − SIP date')}</td>
-      <td data-l="Compliant">${statusChip(s)}</td>
+      <td data-l="Compliant">${statusChip(s)}${flagChip(an, r.id)}</td>
       <td class="act"><button class="icon-btn" data-act="del" data-t="fv" data-id="${r.id}" aria-label="Delete row" title="Delete row">${I.trash}</button></td>
     </tr>`).join('')}</tbody></table></div>
     ${emptyNote(rows.length, c.fv.length)}${moreBtn(rows.length, shown.length)}
@@ -278,7 +283,7 @@ export function fvView() {
 /* ---------- BBT VIEW ---------- */
 const BBT_FILTERS = [['all', 'Fills'], ['good', 'Ready / OK'], ['bad', 'Not OK'], ['need', 'Needs data'], ['wait', 'Awaiting transfer']];
 export function bbtView() {
-  const c = ctx();
+  const c = ctx(), an = anomalyMap();
   const sum = summarise(c.bbt.map((x) => x.r), (r) => bbtStatus(r, c.cfg.dme, c.today, c.cfg.rules));
   const counts = { all: sum.total, good: sum.good, bad: sum.bad, need: sum.need, wait: sum.wait };
   const f = S.ui.bbtFilter;
@@ -289,14 +294,14 @@ export function bbtView() {
   ${toolbar('bbt', rows.length, c.bbt.length)}
   <div class="card tablecard"><div class="tscroll"><table class="grid bbtt">
     <thead><tr><th>BBT</th><th>Clean date<small>acid CIP · CIP</small></th><th class="c" title="Calculated: each acid CIP (acid wash after a fill) adds 1 and a CIP (caustic) resets it to 0 — pick Acid CIP or CIP beside the date; a CIP also takes its SIP date. Type over it to set it by hand. A CIP is required at ${c.cfg.rules.cntMax}.">Acid CIPs<small>count</small></th><th>Transfer date</th><th>From FV · beer</th><th class="c" title="Transfer date − clean date (the SIP date when the clean was a CIP + SIP). Under ${c.cfg.rules.bbtDays} days is green; purple is acceptable for DME BBTs.">CIP → fill<small>days</small></th><th title="Needs fewer than ${c.cfg.rules.cntMax} fills/acid CIPs since the last CIP. Krones BBTs must also be green in CIP → fill.">Ready to fill?</th><th class="act"></th></tr></thead>
-    <tbody>${shown.map(({ r, s }) => `<tr class="row ${s.state}${s.planned ? ' planned' : ''}" data-id="${r.id}">
+    <tbody>${shown.map(({ r, s }) => `<tr class="row ${s.state}${s.planned ? ' planned' : ''}${an.has(r.id) ? ' anom' : ''}" data-id="${r.id}">
       <td data-l="Vessel"><div class="vcell">${vpill('bbt', r.bbt)}<span class="tag ${s.dme ? 'dme' : 'krones'}">${s.dme ? 'DME' : 'Krones'}</span></div></td>
       <td data-l="Clean date">${bbtDate(r)}</td>
       <td data-l="Acid CIPs" class="c">${countIn(r.id, r.acidCount, s.countTone, `BBT ${r.bbt} number of acid CIPs`)}</td>
       <td data-l="Transfer date"><div class="dc">${dateIn('bbt', r.id, 'transfer', r.transfer, `BBT ${r.bbt} transfer date`)}${boardMark(r.tsrc)}${plannedTag(s.planned)}</div></td>
       <td data-l="From" class="beer">${r.fromFv ? `<span class="muted">FV ${r.fromFv}</span> ` : ''}${esc(r.batch)}</td>
       <td data-l="CIP → fill" class="c">${daysChip(s.n, s.nTone, s.nTone === 'dme' ? 'Over 2 days — acceptable for DME BBTs' : 'Transfer date − acid CIP date')}</td>
-      <td data-l="Ready to fill?">${statusChip(s)}</td>
+      <td data-l="Ready to fill?">${statusChip(s)}${flagChip(an, r.id)}</td>
       <td class="act"><button class="icon-btn" data-act="del" data-t="bbt" data-id="${r.id}" aria-label="Delete row" title="Delete row">${I.trash}</button></td>
     </tr>`).join('')}</tbody></table></div>
     ${emptyNote(rows.length, c.bbt.length)}${moreBtn(rows.length, shown.length)}
@@ -360,4 +365,15 @@ export function upcomingView() {
       <td data-l="Status">${WHEN_CHIP(e)}</td>
       <td class="act">${e.when === 'done' ? '' : link(e)}</td></tr>`).join('')).join('')}</tbody></table></div></div>` : ''}
   <p class="muted upfoot">Windows come from the rules in the Overview key: FVs need a CIP under ${cfg.rules.fvCip} days and a SIP under ${cfg.rules.fvSip} days before the brew; brites need an acid CIP under ${cfg.rules.bbtDays} days before the transfer (DME tanks are more flexible), and a CIP + SIP once they reach ${cfg.rules.cntMax} fills. Planned dates come from the Live Brewery Board.</p>`;
+}
+
+export function anomalyBody() {
+  const list = anomalyList();
+  if (!list.length) return `<div class="allgood">${I.check}<div><b>Nothing looks odd.</b><span class="muted">No duplicate entries, date mix-ups, count jumps or other oddities were found.</span></div></div>`;
+  const sect = (kind, title) => {
+    const rows = list.filter((a) => a.kind === kind);
+    if (!rows.length) return '';
+    return `<h4 class="anh">${title} <span class="muted">${rows.length}</span></h4><ul class="anl">${rows.map((a) => `<li><span class="an-v">${vpill(kind, a.vessel)}</span><span class="an-d">${esc(fmtDateY(a.date))}</span><span class="an-t">${esc(a.text)}</span><button class="btn small" type="button" data-close data-act="goto" data-view="${kind}" data-q="${a.vessel}">Open</button></li>`).join('')}</ul>`;
+  };
+  return `<p class="muted">Things that look odd, even where the tank is technically compliant. Newest first.</p>${sect('fv', 'Fermenters')}${sect('bbt', 'Brite tanks')}`;
 }
