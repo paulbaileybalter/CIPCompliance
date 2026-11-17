@@ -224,12 +224,11 @@ export function findAnomalies(d, cfg, today) {
     if (r.sip && r.sip > r.brew) add('fv', r, r.fv, r.brew, 'after', 'SIP is dated after the brew date');
     if (r.cip && r.sip && r.sip < r.cip) add('fv', r, r.fv, r.brew, 'order', 'SIP is dated before its CIP');
     if (past && (!!r.cip !== !!r.sip)) add('fv', r, r.fv, r.brew, 'half', `Only a ${r.cip ? 'CIP' : 'SIP'} was logged. Every CIP is followed by a SIP`);
-    if (st.state === 'ok72') add('fv', r, r.fv, r.brew, 'exception', 'Passes only through the "<72 h since CIP" exception');
     for (const o of fvBy.get(r.fv)) {
       if (o.id === r.id || o.brew < r.brew) continue;            // report each pair once, on the earlier row
       const gap = diffDays(o.brew, r.brew);
       if (gap === 0) add('fv', r, r.fv, r.brew, 'dup', 'Brewed twice on the same day: possible duplicate entry');
-      else if (gap <= 4) add('fv', r, r.fv, r.brew, 'close', `Brewed again only ${gap} day${gap === 1 ? '' : 's'} later (${fmtDate(o.brew)})`);
+      else if (gap >= 2 && gap <= 4) add('fv', r, r.fv, r.brew, 'close', `Brewed again only ${gap} day${gap === 1 ? '' : 's'} later (${fmtDate(o.brew)})`);
     }
   }
 
@@ -241,7 +240,7 @@ export function findAnomalies(d, cfg, today) {
     list.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
     list.forEach((r, i) => {
       const prev = list[i - 1], next = list[i + 1];
-      const T = r.transfer, dme = dmeList.includes(r.bbt), past = T && T < today;
+      const T = r.transfer, past = T && T < today;
       const known = r.acidCount === null || r.acidCount === undefined || r.acidCount === '' ? null : Number(r.acidCount);
       const when = T || r.acidCip;
       if (T && r.acidCip && r.acidCip > T) add('bbt', r, r.bbt, when, 'after', 'Clean is dated after the transfer date');
@@ -252,13 +251,13 @@ export function findAnomalies(d, cfg, today) {
       if (known !== null && r.acidType === 'cip' && known !== 0) add('bbt', r, r.bbt, when, 'count', `Count is ${known} but a CIP resets it to 0`);
       else if (known !== null && r.acidType === 'sip' && prev && prev.acidCount !== null && prev.acidCount !== undefined && prev.acidCount !== '' && known !== Number(prev.acidCount) + 1)
         add('bbt', r, r.bbt, when, 'count', `Count is ${known} but the previous fill was ${prev.acidCount} (expected ${Number(prev.acidCount) + 1})`);
-      if (T && r.acidCip && past) {
-        const n = diffDays(T, r.acidType === 'cip' && r.acidSip ? r.acidSip : r.acidCip);
-        if (dme && n > 7 && known !== null && known < rules.cntMax)
-          add('bbt', r, r.bbt, when, 'sat', `Sat ${n} days after its clean before filling: over a week (DME tank, so it passes)`);
-      }
-      if (T && next && next.transfer && diffDays(next.transfer, T) <= 1) {
-        add('bbt', r, r.bbt, when, diffDays(next.transfer, T) === 0 ? 'dup' : 'close', diffDays(next.transfer, T) === 0 ? 'Two transfers on the same day: possible duplicate entry' : `Filled again ${diffDays(next.transfer, T)} day later (${fmtDate(next.transfer)})`);
+      if (T && next && next.transfer) {
+        const gap = diffDays(next.transfer, T);
+        if (gap === 0) add('bbt', r, r.bbt, when, 'dup', 'Two transfers on the same day: possible duplicate entry');
+        else if (gap === 1) {                         // refilling the next day is fine as long as it got a clean in between
+          const between = (next.acidCip || '') >= T && (next.acidCip || '') <= next.transfer;
+          if (!between) add('bbt', r, r.bbt, when, 'close', `Filled again the next day (${fmtDate(next.transfer)}) with no acid CIP logged in between`);
+        }
       }
     });
   }

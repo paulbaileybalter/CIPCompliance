@@ -424,7 +424,12 @@ test('anomalies: odd rows are flagged even when compliant', () => {
   const has = (id, code) => a.some((x) => x.id === id && x.code === code);
   assert.ok(has('a', 'dup')); assert.ok(has('c', 'order'));
   assert.ok(has('y', 'count'));                 // 2 → 5 isn't +1
-  assert.ok(has('y', 'sat'));                   // DME tank sat 9 days after its clean
+  assert.ok(!has('y', 'sat'));                  // DME tanks can sit longer: not flagged
+  const nx = (acid) => findAnomalies({ fv: [], bbt: [
+    { id: 'p', bbt: 1, acidCip: '2026-03-01', acidType: 'sip', acidCount: 1, transfer: '2026-03-02' },
+    { id: 'q', bbt: 1, acidCip: acid, acidType: 'sip', acidCount: 2, transfer: '2026-03-03' } ] }, cfg, '2026-11-17').some((x) => x.id === 'p' && x.code === 'close');
+  assert.equal(nx('2026-03-02'), false);        // next-day refill with an acid wash in between is fine
+  assert.equal(nx(''), true);                   // ...without one it's flagged
   assert.ok(!a.some((x) => x.id === 'x'));       // a clean row has nothing odd
 });
 
